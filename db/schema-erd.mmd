@@ -1,0 +1,102 @@
+erDiagram
+  USERS ||--o{ PROFILES : owns
+  USERS ||--o{ REFRESH_TOKENS : "has sessions"
+
+  PROFILES ||--|| SETTINGS : has
+  PROFILES ||--o{ TASKS : owns
+  PROFILES ||--o{ NOTES : owns
+  PROFILES ||--o{ HABITS : owns
+  PROFILES ||--o{ HABIT_LOGS : owns
+  PROFILES ||--o{ CALENDAR_EVENTS : owns
+  PROFILES ||--o{ REMINDERS : owns
+  PROFILES ||--o{ BIN_ENTRIES : owns
+
+  TASKS ||--o{ NOTES : "converted from (nullable)"
+  HABITS ||--o{ HABIT_LOGS : "logged daily"
+
+  REMINDERS }o..o{ TASKS : "attaches to (entity_type/id, app-enforced)"
+  REMINDERS }o..o{ HABITS : "attaches to (entity_type/id, app-enforced)"
+  REMINDERS }o..o{ CALENDAR_EVENTS : "attaches to (entity_type/id, app-enforced)"
+
+  BIN_ENTRIES }o..o{ TASKS : "logs delete (app-enforced)"
+  BIN_ENTRIES }o..o{ NOTES : "logs delete (app-enforced)"
+  BIN_ENTRIES }o..o{ HABITS : "logs delete (app-enforced)"
+
+  USERS {
+    uuid id PK
+    text email
+    text password_hash
+  }
+  PROFILES {
+    uuid id PK
+    uuid user_id FK
+    text name
+  }
+  REFRESH_TOKENS {
+    uuid id PK
+    uuid user_id FK
+    text token_hash
+    timestamptz expires_at
+    timestamptz revoked_at
+  }
+  SETTINGS {
+    uuid profile_id PK_FK
+    text timezone
+    smallint week_starts_on
+  }
+  TASKS {
+    uuid id PK
+    uuid profile_id FK
+    text title
+    boolean urgent
+    boolean important
+    timestamptz due_at
+    timestamptz deleted_at
+  }
+  NOTES {
+    uuid id PK
+    uuid profile_id FK
+    text content
+    text_array tags
+    uuid converted_task_id FK
+    timestamptz deleted_at
+  }
+  HABITS {
+    uuid id PK
+    uuid profile_id FK
+    text title
+    smallint target_per_week
+    timestamptz deleted_at
+  }
+  HABIT_LOGS {
+    uuid id PK
+    uuid habit_id FK
+    uuid profile_id FK
+    date log_date
+    boolean completed
+  }
+  CALENDAR_EVENTS {
+    uuid id PK
+    uuid profile_id FK
+    text title
+    timestamptz starts_at
+    timestamptz ends_at
+    timestamptz deleted_at
+  }
+  REMINDERS {
+    uuid id PK
+    uuid profile_id FK
+    text title
+    timestamptz remind_at
+    text entity_type
+    uuid entity_id
+    timestamptz deleted_at
+  }
+  BIN_ENTRIES {
+    uuid id PK
+    uuid profile_id FK
+    text entity_type
+    uuid entity_id
+    timestamptz deleted_at
+    timestamptz auto_purge_at
+  }

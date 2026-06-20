@@ -1,0 +1,9 @@
+# Normalize all text files to LF in the repo, regardless of OS.
+# Git still checks files out using your OS's native line ending locally —
+# this just stops Windows/Mac/Linux contributors from fighting over it
+# in diffs and commits.
+* text=auto eol=lf
+
+# Binary files — never touch line endings, would corrupt them.
+*.png binary
+*.svg binary

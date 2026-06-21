@@ -1,8 +1,5 @@
 require('dotenv').config();
 
-// Fail fast: if a required var is missing, crash on boot with a clear
-// message — not three files deep when some random query mysteriously
-// breaks because SUPABASE_URL was undefined.
 function required(key) {
   const value = process.env[key];
   if (!value) {

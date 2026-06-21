@@ -4,9 +4,6 @@ const { signAccessToken, verifyAccessToken } = require('../utils/jwt');
 const { generateRefreshToken, hashRefreshToken } = require('../utils/refreshToken');
 const config = require('../config/env');
 
-// Small helper: given a userId + profileId, issues BOTH tokens and
-// persists the refresh token's hash. Used by signup and login —
-// keeping it here avoids duplicating this exact sequence twice.
 async function issueTokenPair({ userId, profileId }) {
   const accessToken = signAccessToken({ userId, profileId });
 
@@ -49,9 +46,6 @@ async function signup(req, res) {
       ...tokens,
     });
   } catch (err) {
-    // Postgres unique violation on users.email — race condition safety net,
-    // catches the case where two signups for the same email land at nearly
-    // the same time and both pass the findUserByEmail check above.
     if (err.code === '23505') {
       return res.status(409).json({ error: 'An account with this email already exists.' });
     }
@@ -69,8 +63,6 @@ async function login(req, res) {
 
   try {
     const user = await authService.findUserByEmail(email);
-    // Same error for "no such user" and "wrong password" — never reveal
-    // which one it was, that tells an attacker whether an email is registered.
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
@@ -80,8 +72,6 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // TODO: once multi-profile selection exists, this should use the
-    // user's last-active profile rather than always picking the first one.
     const profile = await authService.findDefaultProfileForUser(user.id);
 
     const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id });
@@ -112,16 +102,8 @@ async function refresh(req, res) {
       return res.status(401).json({ error: 'Invalid or expired refresh token.' });
     }
 
-    // Rotate: revoke the old refresh token, issue a brand new pair.
-    // This means a stolen refresh token only works ONCE before it's dead —
-    // if both the real user and an attacker try to use the same old token
-    // after one of them already rotated it, the second attempt fails here.
     await authService.revokeRefreshToken(tokenHash);
 
-    // We need profile_id for the new access token. Decode it from the
-    // old (still cryptographically valid, just possibly-expired-soon)
-    // access token would require the client to send it too — simpler to
-    // look up the user's active profile fresh each refresh.
     const profile = await authService.findDefaultProfileForUser(existingToken.user_id);
 
     const tokens = await issueTokenPair({

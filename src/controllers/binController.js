@@ -2,6 +2,7 @@ const binService = require('../services/binService');
 const taskService = require('../services/taskService');
 const noteService = require('../services/noteService');
 const reminderService = require('../services/reminderService');
+const habitService = require('../services/habitService');
 
 // Option B restore map — add one line here whenever a new feature is built.
 // entity_type value → { restore, hardDelete } functions from its service.
@@ -18,7 +19,11 @@ const entityHandlers = {
         restore: reminderService.restoreReminder,
         hardDelete: reminderService.hardDeleteReminder,
     },
-    // habit and calendar_event get added here once those modules are built
+    habit: {
+        restore: habitService.restoreHabit,
+        hardDelete: habitService.hardDeleteHabit,
+    },
+    // calendar_event gets added once that module is built
 };
 
 async function listBin(req, res) {
@@ -43,7 +48,6 @@ async function restoreEntry(req, res) {
             return res.status(400).json({ error: `Cannot restore entity_type: ${entry.entity_type}` });
         }
 
-        // Restore the source row (clears deleted_at), then remove from bin.
         await handler.restore(req.profileId, entry.entity_id);
         await binService.removeBinEntry(req.profileId, entry.id);
 
@@ -66,7 +70,6 @@ async function permanentDelete(req, res) {
             return res.status(400).json({ error: `Cannot delete entity_type: ${entry.entity_type}` });
         }
 
-        // Hard-delete the source row first, then remove from bin.
         await handler.hardDelete(req.profileId, entry.entity_id);
         await binService.removeBinEntry(req.profileId, entry.id);
 
@@ -78,7 +81,6 @@ async function permanentDelete(req, res) {
 }
 
 // Called by the cron job — not an HTTP endpoint.
-// Finds all expired bin entries and hard-deletes their source rows + bin entry.
 async function purgeExpiredEntries() {
     const expired = await binService.getExpiredBinEntries();
 

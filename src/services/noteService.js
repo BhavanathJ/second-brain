@@ -1,8 +1,5 @@
 const supabase = require('../config/supabase');
 
-// Every query filters deleted_at IS NULL — same discipline as taskService.
-// The one exception (Bin restore) lives in binService, not here.
-
 async function listNotes(profileId, { tags } = {}) {
     let query = supabase
         .from('notes')
@@ -11,10 +8,6 @@ async function listNotes(profileId, { tags } = {}) {
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
-    // tags is an array of strings e.g. ["work", "ideas"].
-    // cs = "contains" — returns notes whose tags array contains ALL of
-    // the requested tags. e.g. ?tags=work,ideas only returns notes tagged
-    // with both, not just one of them.
     if (tags && tags.length > 0) {
         query = query.contains('tags', tags);
     }
@@ -66,8 +59,6 @@ async function updateNote(profileId, noteId, fields) {
     return data;
 }
 
-// Called after a task has already been created from this note's content.
-// Writes the task's id back onto the note so the link is traceable both ways.
 async function markNoteConverted(profileId, noteId, taskId) {
     const { data, error } = await supabase
         .from('notes')
@@ -99,6 +90,29 @@ async function softDeleteNote(profileId, noteId) {
     return data;
 }
 
+async function restoreNote(profileId, noteId) {
+    const { data, error } = await supabase
+        .from('notes')
+        .update({ deleted_at: null, updated_at: new Date().toISOString() })
+        .eq('profile_id', profileId)
+        .eq('id', noteId)
+        .select()
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
+async function hardDeleteNote(profileId, noteId) {
+    const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('profile_id', profileId)
+        .eq('id', noteId);
+
+    if (error) throw error;
+}
+
 module.exports = {
     listNotes,
     getNoteById,
@@ -106,4 +120,6 @@ module.exports = {
     updateNote,
     markNoteConverted,
     softDeleteNote,
+    restoreNote,
+    hardDeleteNote,
 };

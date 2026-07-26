@@ -6,7 +6,10 @@ const authRoutes = require('./routes/authRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const reminderRoutes = require('./routes/reminderRoutes');
+const binRoutes = require('./routes/binRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 const { fireReminders } = require('./services/reminderService');
+const { purgeExpiredEntries } = require('./controllers/binController');
 
 const app = express();
 
@@ -19,15 +22,22 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/bin', binRoutes);
+app.use('/api/settings', settingsRoutes);
 
-// Fires every minute — checks for due reminders across all profiles.
-// '* * * * *' = every minute. Errors are caught and logged so a single
-// cron failure never crashes the whole Express process.
 cron.schedule('* * * * *', async () => {
   try {
     await fireReminders();
   } catch (err) {
     console.error('[cron] fireReminders failed:', err);
+  }
+});
+
+cron.schedule('0 0 * * *', async () => {
+  try {
+    await purgeExpiredEntries();
+  } catch (err) {
+    console.error('[cron] purgeExpiredEntries failed:', err);
   }
 });
 

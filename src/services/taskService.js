@@ -76,4 +76,38 @@ async function softDeleteTask(profileId, taskId) {
     return data;
 }
 
-module.exports = { listTasks, getTaskById, createTask, updateTask, softDeleteTask };
+// Restore: clears deleted_at so the task reappears in normal queries.
+async function restoreTask(profileId, taskId) {
+    const { data, error } = await supabase
+        .from('tasks')
+        .update({ deleted_at: null, updated_at: new Date().toISOString() })
+        .eq('profile_id', profileId)
+        .eq('id', taskId)
+        .select()
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
+// Permanent delete: removes the row entirely. Called from Bin only —
+// normal task deletion always uses softDeleteTask.
+async function hardDeleteTask(profileId, taskId) {
+    const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('profile_id', profileId)
+        .eq('id', taskId);
+
+    if (error) throw error;
+}
+
+module.exports = {
+    listTasks,
+    getTaskById,
+    createTask,
+    updateTask,
+    softDeleteTask,
+    restoreTask,
+    hardDeleteTask,
+};

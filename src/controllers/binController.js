@@ -3,9 +3,9 @@ const taskService = require('../services/taskService');
 const noteService = require('../services/noteService');
 const reminderService = require('../services/reminderService');
 const habitService = require('../services/habitService');
+const calendarEventService = require('../services/calendarEventService');
 
 // Option B restore map — add one line here whenever a new feature is built.
-// entity_type value → { restore, hardDelete } functions from its service.
 const entityHandlers = {
     task: {
         restore: taskService.restoreTask,
@@ -23,7 +23,11 @@ const entityHandlers = {
         restore: habitService.restoreHabit,
         hardDelete: habitService.hardDeleteHabit,
     },
-    // calendar_event gets added once that module is built
+    calendar_event: {
+        restore: calendarEventService.restoreCalendarEvent,
+        hardDelete: calendarEventService.hardDeleteCalendarEvent,
+    },
+    // add new features here as they're built
 };
 
 async function listBin(req, res) {
@@ -80,7 +84,6 @@ async function permanentDelete(req, res) {
     }
 }
 
-// Called by the cron job — not an HTTP endpoint.
 async function purgeExpiredEntries() {
     const expired = await binService.getExpiredBinEntries();
 

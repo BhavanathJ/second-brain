@@ -9,6 +9,8 @@ const reminderRoutes = require('./routes/reminderRoutes');
 const binRoutes = require('./routes/binRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const habitRoutes = require('./routes/habitRoutes');
+const calendarEventRoutes = require('./routes/calendarEventRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 const { fireReminders } = require('./services/reminderService');
 const { purgeExpiredEntries } = require('./controllers/binController');
 
@@ -26,6 +28,8 @@ app.use('/api/reminders', reminderRoutes);
 app.use('/api/bin', binRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/habits', habitRoutes);
+app.use('/api/calendar-events', calendarEventRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 cron.schedule('* * * * *', async () => {
   try {

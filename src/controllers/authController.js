@@ -1,4 +1,5 @@
 const authService = require('../services/authService');
+const settingsService = require('../services/settingsService');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { signAccessToken, verifyAccessToken } = require('../utils/jwt');
 const { generateRefreshToken, hashRefreshToken } = require('../utils/refreshToken');
@@ -13,7 +14,7 @@ async function issueTokenPair({ userId, profileId }) {
     Date.now() + config.jwt.refreshExpiresInDays * 24 * 60 * 60 * 1000
   ).toISOString();
 
-  await authService.storeRefreshToken({ userId, tokenHash, expiresAt });
+  await authService.storeRefreshToken({ userId, profileId, tokenHash, expiresAt });
 
   return { accessToken, refreshToken: rawRefreshToken };
 }
@@ -37,6 +38,7 @@ async function signup(req, res) {
     const passwordHash = await hashPassword(password);
     const user = await authService.createUser({ email, passwordHash });
     const profile = await authService.createDefaultProfile(user.id);
+    await settingsService.createDefaultSettings(profile.id);
 
     const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id });
 
@@ -104,11 +106,9 @@ async function refresh(req, res) {
 
     await authService.revokeRefreshToken(tokenHash);
 
-    const profile = await authService.findDefaultProfileForUser(existingToken.user_id);
-
     const tokens = await issueTokenPair({
       userId: existingToken.user_id,
-      profileId: profile.id,
+      profileId: existingToken.profile_id,
     });
 
     return res.status(200).json(tokens);
@@ -135,4 +135,4 @@ async function logout(req, res) {
   }
 }
 
-module.exports = { signup, login, refresh, logout };
+module.exports = { signup, login, refresh, logout, issueTokenPair };

@@ -3,6 +3,7 @@ const cors = require('cors');
 const cron = require('node-cron');
 const config = require('./config/env');
 const authRoutes = require('./routes/authRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const reminderRoutes = require('./routes/reminderRoutes');
@@ -23,6 +24,7 @@ app.use(express.json());
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/profiles', profileRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/reminders', reminderRoutes);

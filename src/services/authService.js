@@ -57,10 +57,10 @@ async function findDefaultProfileForUser(userId) {
     return data;
 }
 
-async function storeRefreshToken({ userId, tokenHash, expiresAt }) {
+async function storeRefreshToken({ userId, profileId, tokenHash, expiresAt }) {
     const { error } = await supabase
         .from('refresh_tokens')
-        .insert({ user_id: userId, token_hash: tokenHash, expires_at: expiresAt });
+        .insert({ user_id: userId, profile_id: profileId, token_hash: tokenHash, expires_at: expiresAt });
 
     if (error) throw error;
 }

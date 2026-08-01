@@ -1,0 +1,117 @@
+/* ===== Design tokens — used across every page, not just login ===== */
+:root {
+    --sb-ink: #0f172a;
+    /* primary text/nav — not Bootstrap's default gray */
+    --sb-accent: #0d9488;
+    /* teal — actions, active nav, urgent/important flags */
+    --sb-accent-hover: #0f766e;
+    --sb-bg: #f8fafc;
+    --sb-surface: #ffffff;
+    --sb-border: #e2e8f0;
+    --sb-radius: 6px;
+    --sb-font: 'Inter', system-ui, -apple-system, sans-serif;
+    --sb-mono: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+}
+
+body {
+    font-family: var(--sb-font);
+    color: var(--sb-ink);
+    background-color: var(--sb-bg);
+}
+
+/* Override Bootstrap's primary everywhere it's used (buttons, links, focus rings) */
+.btn-primary {
+    background-color: var(--sb-accent);
+    border-color: var(--sb-accent);
+    border-radius: var(--sb-radius);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--sb-accent-hover);
+    border-color: var(--sb-accent-hover);
+}
+
+.form-control:focus {
+    border-color: var(--sb-accent);
+    box-shadow: 0 0 0 0.2rem rgba(13, 148, 136, 0.2);
+}
+
+a {
+    color: var(--sb-accent);
+}
+
+a:hover {
+    color: var(--sb-accent-hover);
+}
+
+.form-control,
+.btn {
+    border-radius: var(--sb-radius);
+}
+
+/* ===== Auth page (login/signup) ===== */
+.auth-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 2rem;
+}
+
+.auth-wordmark {
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: -0.01em;
+    margin-bottom: 1.75rem;
+}
+
+.auth-wordmark span {
+    color: var(--sb-accent);
+}
+
+.auth-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--sb-border);
+    margin-bottom: 1.5rem;
+}
+
+.auth-tab {
+    flex: 1;
+    text-align: center;
+    padding: 0.6rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+.auth-tab.active {
+    color: var(--sb-ink);
+    border-bottom-color: var(--sb-accent);
+}
+
+.auth-error {
+    font-size: 0.85rem;
+    color: #dc2626;
+    margin-top: 0.75rem;
+    display: none;
+}
+
+.auth-error.visible {
+    display: block;
+}

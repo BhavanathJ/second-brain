@@ -1,6 +1,7 @@
 erDiagram
   USERS ||--o{ PROFILES : owns
   USERS ||--o{ REFRESH_TOKENS : "has sessions"
+  PROFILES ||--o{ REFRESH_TOKENS : "active in"
 
   PROFILES ||--|| SETTINGS : has
   PROFILES ||--o{ TASKS : owns
@@ -35,6 +36,7 @@ erDiagram
   REFRESH_TOKENS {
     uuid id PK
     uuid user_id FK
+    uuid profile_id FK
     text token_hash
     timestamptz expires_at
     timestamptz revoked_at

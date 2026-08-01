@@ -2,6 +2,7 @@ const settingsService = require('../services/settingsService');
 
 const VALID_THEMES = ['light', 'dark'];
 const VALID_WEEK_STARTS = [0, 1]; // 0 = Sunday, 1 = Monday
+const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'));
 
 async function getSettings(req, res) {
     try {
@@ -35,6 +36,9 @@ async function updateSettings(req, res) {
     }
     if (fields.week_starts_on !== undefined && !VALID_WEEK_STARTS.includes(fields.week_starts_on)) {
         return res.status(400).json({ error: 'Invalid week_starts_on. Must be 0 (Sunday) or 1 (Monday).' });
+    }
+    if (fields.timezone && !VALID_TIMEZONES.has(fields.timezone)) {
+        return res.status(400).json({ error: 'Invalid timezone. Must be a valid IANA timezone name (e.g. "Asia/Kolkata").' });
     }
 
     try {

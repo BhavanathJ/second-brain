@@ -1,33 +1,9 @@
 const supabase = require('../config/supabase');
+const { getLocalDayBounds, getLocalRangeBounds, getLocalDateString } = require('../utils/profileTime');
 
-// All date comparisons use UTC. Frontend formats dates for display
-// in the user's local timezone — backend stays UTC throughout.
-
-function getTodayBounds() {
-    const start = new Date();
-    start.setUTCHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setUTCHours(23, 59, 59, 999);
-    return { start: start.toISOString(), end: end.toISOString() };
-}
-
-function getTomorrowBounds() {
-    const start = new Date();
-    start.setUTCDate(start.getUTCDate() + 1);
-    start.setUTCHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setUTCHours(23, 59, 59, 999);
-    return { start: start.toISOString(), end: end.toISOString() };
-}
-
-function getNext7DaysBounds() {
-    const start = new Date();
-    start.setUTCHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setUTCDate(end.getUTCDate() + 7);
-    end.setUTCHours(23, 59, 59, 999);
-    return { start: start.toISOString(), end: end.toISOString() };
-}
+// All date/time bounds are computed in the profile's local timezone
+// (via profileTime.js), not UTC. "Today" means the profile's local
+// calendar day.
 
 // --- Individual queries ---
 
@@ -45,17 +21,14 @@ async function getTasksForRange(profileId, start, end) {
     return data;
 }
 
-async function getOverdueTasks(profileId) {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-
+async function getOverdueTasks(profileId, todayStartISO) {
     const { data, error } = await supabase
         .from('tasks')
         .select('*')
         .eq('profile_id', profileId)
         .is('deleted_at', null)
         .eq('status', 'pending')
-        .lt('due_at', today.toISOString()) // due_at is before today
+        .lt('due_at', todayStartISO) // due_at is before the profile's local "today"
         .order('due_at', { ascending: true });
 
     if (error) throw error;
@@ -64,9 +37,8 @@ async function getOverdueTasks(profileId) {
 
 // Returns all active habits with today's completion status attached.
 // Two queries: fetch habits, fetch today's logs, merge in JS.
-// Avoids a complex SQL join while keeping the response shape clean.
-async function getHabitsWithTodayStatus(profileId) {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+async function getHabitsWithTodayStatus(profileId, timeZone) {
+    const today = getLocalDateString(timeZone); // 'YYYY-MM-DD' — matches habit_logs.log_date
 
     const [habitsResult, logsResult] = await Promise.all([
         supabase
@@ -86,7 +58,6 @@ async function getHabitsWithTodayStatus(profileId) {
     if (habitsResult.error) throw habitsResult.error;
     if (logsResult.error) throw logsResult.error;
 
-    // Build a Set of habit_ids completed today for O(1) lookup.
     const completedToday = new Set(logsResult.data.map((l) => l.habit_id));
 
     return habitsResult.data.map((habit) => ({
@@ -126,11 +97,12 @@ async function getCalendarEventsForRange(profileId, start, end) {
 
 // --- Main aggregation ---
 // Runs all queries in parallel using Promise.all.
-// Total response time = slowest single query, not the sum of all queries.
-async function getDashboardData(profileId) {
-    const today = getTodayBounds();
-    const tomorrow = getTomorrowBounds();
-    const next7 = getNext7DaysBounds();
+// timeZone comes from the profile's settings — caller (controller)
+// fetches it once and passes it in here.
+async function getDashboardData(profileId, timeZone) {
+    const today = getLocalDayBounds(timeZone, 0);
+    const tomorrow = getLocalDayBounds(timeZone, 1);
+    const next7 = getLocalRangeBounds(timeZone, 7);
 
     const [
         todayTasks,
@@ -148,14 +120,14 @@ async function getDashboardData(profileId) {
         getTasksForRange(profileId, today.start, today.end),
         getRemindersForRange(profileId, today.start, today.end),
         getCalendarEventsForRange(profileId, today.start, today.end),
-        getHabitsWithTodayStatus(profileId),
+        getHabitsWithTodayStatus(profileId, timeZone),
         getTasksForRange(profileId, tomorrow.start, tomorrow.end),
         getRemindersForRange(profileId, tomorrow.start, tomorrow.end),
         getCalendarEventsForRange(profileId, tomorrow.start, tomorrow.end),
         getTasksForRange(profileId, next7.start, next7.end),
         getRemindersForRange(profileId, next7.start, next7.end),
         getCalendarEventsForRange(profileId, next7.start, next7.end),
-        getOverdueTasks(profileId),
+        getOverdueTasks(profileId, today.start),
     ]);
 
     return {

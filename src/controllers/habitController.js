@@ -1,20 +1,24 @@
 const habitService = require('../services/habitService');
 const habitLogService = require('../services/habitLogService');
 const binService = require('../services/binService');
+const settingsService = require('../services/settingsService');
+const { getLocalDateString } = require('../utils/profileTime');
 
 // --- HABITS CRUD ---
 
 async function listHabits(req, res) {
     try {
+        const settings = await settingsService.getSettings(req.profileId);
+        const { timezone, week_starts_on } = settings;
+
         const habits = await habitService.listHabits(req.profileId);
 
         // Attach weekly progress to each habit so the frontend doesn't need
         // a second request per habit to show "3 of 5 this week".
-        const today = new Date();
         const habitsWithProgress = await Promise.all(
             habits.map(async (habit) => {
-                const weeklyCount = await habitService.getWeeklyCompletionCount(habit.id, today);
-                const streak = await habitService.computeStreak(habit.id, habit.target_per_week);
+                const weeklyCount = await habitService.getWeeklyCompletionCount(habit.id, timezone, week_starts_on);
+                const streak = await habitService.computeStreak(habit.id, habit.target_per_week, timezone, week_starts_on);
                 return {
                     ...habit,
                     this_week_count: weeklyCount,
@@ -38,9 +42,11 @@ async function getHabit(req, res) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
 
-        const today = new Date();
-        const weeklyCount = await habitService.getWeeklyCompletionCount(habit.id, today);
-        const streak = await habitService.computeStreak(habit.id, habit.target_per_week);
+        const settings = await settingsService.getSettings(req.profileId);
+        const { timezone, week_starts_on } = settings;
+
+        const weeklyCount = await habitService.getWeeklyCompletionCount(habit.id, timezone, week_starts_on);
+        const streak = await habitService.computeStreak(habit.id, habit.target_per_week, timezone, week_starts_on);
 
         return res.status(200).json({
             habit: {
@@ -130,14 +136,20 @@ async function deleteHabit(req, res) {
 
 // Mark today (or a specific date) as completed.
 async function logCompletion(req, res) {
-    // Default to today if no date provided — most common case.
-    // Accept a date override so the frontend can backfill missed days.
-    const date = req.body.date ?? new Date().toISOString().split('T')[0];
-
     try {
         const habit = await habitService.getHabitById(req.profileId, req.params.id);
         if (!habit) {
             return res.status(404).json({ error: 'Habit not found.' });
+        }
+
+        // Default to today if no date provided — "today" means the
+        // profile's LOCAL calendar day, not the server's UTC day.
+        // Fixes: a habit checked off near midnight IST used to log
+        // against the wrong calendar date.
+        let date = req.body.date;
+        if (!date) {
+            const settings = await settingsService.getSettings(req.profileId);
+            date = getLocalDateString(settings.timezone);
         }
 
         const log = await habitLogService.createLog(habit.id, req.profileId, date);

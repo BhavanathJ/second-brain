@@ -1,8 +1,10 @@
 const dashboardService = require('../services/dashboardService');
+const settingsService = require('../services/settingsService');
 
 async function getDashboard(req, res) {
     try {
-        const data = await dashboardService.getDashboardData(req.profileId);
+        const settings = await settingsService.getSettings(req.profileId);
+        const data = await dashboardService.getDashboardData(req.profileId, settings.timezone);
         return res.status(200).json(data);
     } catch (err) {
         console.error('Dashboard error:', err);

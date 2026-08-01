@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notes — Second Brain</title>
+    <script>
+        (function () {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="../css/app.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app-nav"></div>
+
+    <main class="notes-page">
+        <h1 class="h4 mb-3">Notes</h1>
+
+        <div class="note-capture">
+            <form id="captureForm">
+                <textarea class="form-control mb-2" id="captureContent" rows="3" placeholder="Capture a thought..."
+                    required></textarea>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm" id="captureTags"
+                        placeholder="tags, comma, separated (optional)" />
+                    <button type="submit" class="btn btn-primary btn-sm text-nowrap">Save Note</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="note-filter">
+            <input type="text" class="form-control form-control-sm" id="tagFilter"
+                placeholder="Filter by tag(s), comma-separated" />
+            <button class="btn btn-outline-secondary btn-sm text-nowrap" id="applyFilterBtn">Filter</button>
+            <button class="btn btn-outline-secondary btn-sm text-nowrap" id="clearFilterBtn">Clear</button>
+        </div>
+
+        <div id="notesList"></div>
+    </main>
+
+    <!-- Edit Note Modal -->
+    <div class="modal fade" id="noteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="editNoteForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Note</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="editNoteId" />
+                        <div class="mb-3">
+                            <label class="form-label" for="editNoteContent">Content</label>
+                            <textarea class="form-control" id="editNoteContent" rows="4" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="editNoteTags">Tags (comma-separated)</label>
+                            <input type="text" class="form-control" id="editNoteTags" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="../js/pages/notes.js"></script>
+</body>
+
+</html>

@@ -63,6 +63,7 @@ async function getHabitsWithTodayStatus(profileId, timeZone) {
     return habitsResult.data.map((habit) => ({
         ...habit,
         completed_today: completedToday.has(habit.id),
+        today_date: today, // the exact local date string used for this check — frontend uses this for un-marking, never computes its own
     }));
 }
 

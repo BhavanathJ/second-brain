@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — Second Brain</title>
+    <script>
+        // Applies the cached theme BEFORE first paint, so there's no flash of
+        // the wrong theme while layout.js's async settings fetch is in flight.
+        (function () {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="../css/app.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app-nav"></div>
+
+    <main class="dashboard-page">
+        <div id="overdueSection"></div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="dash-card">
+                    <div class="dash-section-title">Today · Tasks</div>
+                    <div id="todayTasks"></div>
+                </div>
+                <div class="dash-card">
+                    <div class="dash-section-title">Today · Habits</div>
+                    <div id="todayHabits"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="dash-card">
+                    <div class="dash-section-title">Today · Reminders</div>
+                    <div id="todayReminders"></div>
+                </div>
+                <div class="dash-card">
+                    <div class="dash-section-title">Today · Calendar Events</div>
+                    <div id="todayEvents"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dash-card">
+            <div class="dash-section-title">Tomorrow</div>
+            <div id="tomorrowItems"></div>
+        </div>
+
+        <div class="dash-card">
+            <div class="dash-section-title">Next 7 Days</div>
+            <div id="next7Items"></div>
+        </div>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="../js/pages/dashboard.js"></script>
+</body>
+
+</html>

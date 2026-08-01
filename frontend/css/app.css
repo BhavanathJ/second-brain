@@ -115,3 +115,415 @@ a:hover {
 .auth-error.visible {
     display: block;
 }
+
+/* ===== App shell — navbar, shared across every authenticated page ===== */
+.app-navbar {
+    background: var(--sb-surface);
+    border-bottom: 1px solid var(--sb-border);
+    padding: 0.6rem 1rem;
+}
+
+.app-wordmark {
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+    color: var(--sb-ink) !important;
+}
+
+.app-wordmark span {
+    color: var(--sb-accent);
+}
+
+.app-navbar .nav-link {
+    color: #64748b;
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.75rem;
+}
+
+.app-navbar .nav-link.active {
+    color: var(--sb-accent);
+    font-weight: 600;
+}
+
+.app-profile-select {
+    max-width: 140px;
+}
+
+/* ===== Dark theme — toggled via [data-theme="dark"] on <html> ===== */
+[data-theme="dark"] {
+    --sb-ink: #f1f5f9;
+    --sb-bg: #0f172a;
+    --sb-surface: #1e293b;
+    --sb-border: #334155;
+}
+
+[data-theme="dark"] .app-navbar .nav-link {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: var(--sb-ink);
+}
+
+/* ===== Dashboard page ===== */
+.dashboard-page {
+    padding: 1.5rem 1rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.dash-section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+}
+
+.dash-card {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.dash-overdue {
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+[data-theme="dark"] .dash-overdue {
+    background: #450a0a;
+    border-color: #7f1d1d;
+}
+
+.dash-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--sb-border);
+    font-size: 0.9rem;
+}
+
+.dash-item:last-child {
+    border-bottom: none;
+}
+
+.dash-item-title {
+    flex: 1;
+}
+
+.dash-item-time {
+    font-family: var(--sb-mono);
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.dash-empty {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+}
+
+.dash-habit-done {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+/* ===== Tasks page — Eisenhower Matrix ===== */
+.tasks-page {
+    padding: 1.5rem 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tasks-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.matrix-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 700px) {
+    .matrix-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.quadrant {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 1rem;
+    min-height: 160px;
+    border-top: 3px solid var(--sb-border);
+}
+
+.quadrant.q-do-first {
+    border-top-color: var(--sb-accent);
+}
+
+.quadrant.q-schedule {
+    border-top-color: #6366f1;
+}
+
+.quadrant.q-delegate {
+    border-top-color: #f59e0b;
+}
+
+.quadrant.q-eliminate {
+    border-top-color: #94a3b8;
+}
+
+.quadrant-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    margin-bottom: 0.15rem;
+}
+
+.quadrant-subtitle {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+}
+
+.task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--sb-border);
+    font-size: 0.88rem;
+}
+
+.task-item:last-child {
+    border-bottom: none;
+}
+
+.task-item.task-done .task-item-title {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.task-item-body {
+    flex: 1;
+}
+
+.task-item-time {
+    font-family: var(--sb-mono);
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.task-item-actions {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.task-item-actions button {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.4rem;
+}
+
+/* ===== Dark theme — modal support (Bootstrap modals have no built-in dark mode) ===== */
+[data-theme="dark"] .modal-content {
+    background-color: var(--sb-surface);
+    color: var(--sb-ink);
+    border-color: var(--sb-border);
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+    border-color: var(--sb-border);
+}
+
+[data-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    /* dark X icon -> visible on dark bg */
+}
+
+[data-theme="dark"] .form-label,
+[data-theme="dark"] .form-check-label {
+    color: var(--sb-ink);
+}
+
+[data-theme="dark"] .form-text {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] textarea.form-control::placeholder,
+[data-theme="dark"] input.form-control::placeholder {
+    color: #64748b;
+}
+
+/* ===== Notes page ===== */
+.notes-page {
+    padding: 1.5rem 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.note-capture {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.note-filter {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.note-card {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.note-content {
+    white-space: pre-wrap;
+    font-size: 0.92rem;
+    margin-bottom: 0.5rem;
+}
+
+.note-tags {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.note-tag {
+    background: var(--sb-bg);
+    border: 1px solid var(--sb-border);
+    color: #64748b;
+    font-size: 0.72rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+}
+
+.note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.note-converted-badge {
+    font-size: 0.75rem;
+    color: var(--sb-accent);
+    font-weight: 600;
+}
+
+.note-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.note-actions button {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+}
+
+/* ===== Habits page ===== */
+.habits-page {
+    padding: 1.5rem 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.habit-card {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.habit-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.habit-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.habit-streak {
+    font-size: 0.78rem;
+    color: var(--sb-accent);
+    font-weight: 600;
+}
+
+.habit-progress-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.habit-week-grid {
+    display: flex;
+    gap: 0.35rem;
+    margin: 0.75rem 0;
+}
+
+.habit-day-cell {
+    flex: 1;
+    text-align: center;
+    border: 1px solid var(--sb-border);
+    border-radius: 6px;
+    padding: 0.35rem 0.2rem;
+    cursor: pointer;
+    font-size: 0.7rem;
+    background: var(--sb-bg);
+    transition: background 0.1s;
+}
+
+.habit-day-cell:hover {
+    border-color: var(--sb-accent);
+}
+
+.habit-day-cell.done {
+    background: var(--sb-accent);
+    border-color: var(--sb-accent);
+    color: #fff;
+}
+
+.habit-day-cell.today {
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+.habit-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.habit-actions button {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+}

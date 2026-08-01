@@ -4,8 +4,6 @@ const binService = require('../services/binService');
 const settingsService = require('../services/settingsService');
 const { getLocalDateString } = require('../utils/profileTime');
 
-// --- HABITS CRUD ---
-
 async function listHabits(req, res) {
     try {
         const settings = await settingsService.getSettings(req.profileId);
@@ -13,8 +11,6 @@ async function listHabits(req, res) {
 
         const habits = await habitService.listHabits(req.profileId);
 
-        // Attach weekly progress to each habit so the frontend doesn't need
-        // a second request per habit to show "3 of 5 this week".
         const habitsWithProgress = await Promise.all(
             habits.map(async (habit) => {
                 const weeklyCount = await habitService.getWeeklyCompletionCount(habit.id, timezone, week_starts_on);
@@ -63,13 +59,16 @@ async function getHabit(req, res) {
 }
 
 async function createHabit(req, res) {
-    const { title, targetPerWeek } = req.body;
+    // target_per_week now matches updateHabit's field name — previously
+    // camelCase here (targetPerWeek) while update used snake_case,
+    // same mismatch pattern as tasks/reminders/calendar_events had.
+    const { title, target_per_week } = req.body;
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title is required.' });
     }
-    if (targetPerWeek !== undefined) {
-        const n = Number(targetPerWeek);
+    if (target_per_week !== undefined) {
+        const n = Number(target_per_week);
         if (!Number.isInteger(n) || n < 1 || n > 7) {
             return res.status(400).json({ error: 'target_per_week must be an integer between 1 and 7.' });
         }
@@ -78,7 +77,7 @@ async function createHabit(req, res) {
     try {
         const habit = await habitService.createHabit(req.profileId, {
             title: title.trim(),
-            targetPerWeek,
+            target_per_week,
         });
         return res.status(201).json({ habit });
     } catch (err) {
@@ -132,9 +131,6 @@ async function deleteHabit(req, res) {
     }
 }
 
-// --- HABIT LOGS (Option B: explicit create/delete) ---
-
-// Mark today (or a specific date) as completed.
 async function logCompletion(req, res) {
     try {
         const habit = await habitService.getHabitById(req.profileId, req.params.id);
@@ -142,10 +138,6 @@ async function logCompletion(req, res) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
 
-        // Default to today if no date provided — "today" means the
-        // profile's LOCAL calendar day, not the server's UTC day.
-        // Fixes: a habit checked off near midnight IST used to log
-        // against the wrong calendar date.
         let date = req.body.date;
         if (!date) {
             const settings = await settingsService.getSettings(req.profileId);
@@ -155,7 +147,6 @@ async function logCompletion(req, res) {
         const log = await habitLogService.createLog(habit.id, req.profileId, date);
         return res.status(201).json({ log });
     } catch (err) {
-        // UNIQUE constraint violation — already logged for this date.
         if (err.code === '23505') {
             return res.status(409).json({ error: 'Habit already logged for this date.' });
         }
@@ -164,7 +155,6 @@ async function logCompletion(req, res) {
     }
 }
 
-// Unmark a completion for a specific date.
 async function deleteLog(req, res) {
     const { date } = req.params;
 
@@ -186,7 +176,6 @@ async function deleteLog(req, res) {
     }
 }
 
-// Get logs for a date range — used by Calendar.
 async function getLogs(req, res) {
     const { start, end } = req.query;
 

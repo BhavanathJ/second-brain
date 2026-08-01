@@ -31,24 +31,26 @@ async function getReminder(req, res) {
 }
 
 async function createReminder(req, res) {
-    const { title, remindAt, entityType, entityId } = req.body;
+    // remind_at/entity_type/entity_id now match updateReminder's field
+    // names — previously camelCase here (remindAt/entityType/entityId)
+    // while update used snake_case, and this endpoint would actively
+    // reject the "correct" snake_case name instead of just ignoring it.
+    const { title, remind_at, entity_type, entity_id } = req.body;
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title is required.' });
     }
-    if (!remindAt) {
+    if (!remind_at) {
         return res.status(400).json({ error: 'remind_at timestamp is required.' });
     }
 
-    // entity_type and entity_id must come together — one without the other
-    // makes no sense and would create an unresolvable link in the DB.
-    if (entityType && !entityId) {
+    if (entity_type && !entity_id) {
         return res.status(400).json({ error: 'entity_id is required when entity_type is set.' });
     }
-    if (entityId && !entityType) {
+    if (entity_id && !entity_type) {
         return res.status(400).json({ error: 'entity_type is required when entity_id is set.' });
     }
-    if (entityType && !VALID_ENTITY_TYPES.includes(entityType)) {
+    if (entity_type && !VALID_ENTITY_TYPES.includes(entity_type)) {
         return res.status(400).json({
             error: `Invalid entity_type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}.`,
         });
@@ -57,9 +59,9 @@ async function createReminder(req, res) {
     try {
         const reminder = await reminderService.createReminder(req.profileId, {
             title: title.trim(),
-            remindAt,
-            entityType,
-            entityId,
+            remind_at,
+            entity_type,
+            entity_id,
         });
         return res.status(201).json({ reminder });
     } catch (err) {

@@ -26,24 +26,23 @@ async function getCalendarEvent(req, res) {
 }
 
 async function createCalendarEvent(req, res) {
-    const { title, startsAt, endsAt, location } = req.body;
+    const { title, starts_at, ends_at, location } = req.body;
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title is required.' });
     }
-    if (!startsAt) {
+    if (!starts_at) {
         return res.status(400).json({ error: 'starts_at timestamp is required.' });
     }
-    // If both provided, ends_at must be after starts_at.
-    if (endsAt && new Date(endsAt) <= new Date(startsAt)) {
+    if (ends_at && new Date(ends_at) <= new Date(starts_at)) {
         return res.status(400).json({ error: 'ends_at must be after starts_at.' });
     }
 
     try {
         const event = await calendarEventService.createCalendarEvent(req.profileId, {
             title: title.trim(),
-            startsAt,
-            endsAt,
+            starts_at,
+            ends_at,
             location,
         });
         return res.status(201).json({ event });

@@ -29,14 +29,14 @@ async function getCalendarEventById(profileId, eventId) {
     return data;
 }
 
-async function createCalendarEvent(profileId, { title, startsAt, endsAt, location }) {
+async function createCalendarEvent(profileId, { title, starts_at, ends_at, location }) {
     const { data, error } = await supabase
         .from('calendar_events')
         .insert({
             profile_id: profileId,
             title,
-            starts_at: startsAt,
-            ends_at: endsAt ?? null,
+            starts_at: starts_at,
+            ends_at: ends_at ?? null,
             location: location ?? null,
         })
         .select()
@@ -45,7 +45,6 @@ async function createCalendarEvent(profileId, { title, startsAt, endsAt, locatio
     if (error) throw error;
     return data;
 }
-
 async function updateCalendarEvent(profileId, eventId, fields) {
     const { data, error } = await supabase
         .from('calendar_events')

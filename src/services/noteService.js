@@ -59,6 +59,10 @@ async function updateNote(profileId, noteId, fields) {
     return data;
 }
 
+// Conditional write — only succeeds if the note is still unconverted.
+// Guards against two concurrent conversion requests both winning: the
+// second one gets `null` back instead of silently overwriting the
+// first request's converted_task_id.
 async function markNoteConverted(profileId, noteId, taskId) {
     const { data, error } = await supabase
         .from('notes')
@@ -69,11 +73,12 @@ async function markNoteConverted(profileId, noteId, taskId) {
         .eq('profile_id', profileId)
         .eq('id', noteId)
         .is('deleted_at', null)
+        .is('converted_task_id', null)
         .select()
         .maybeSingle();
 
     if (error) throw error;
-    return data;
+    return data; // null if already converted by a concurrent request
 }
 
 async function softDeleteNote(profileId, noteId) {

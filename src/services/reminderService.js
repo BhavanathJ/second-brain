@@ -28,15 +28,15 @@ async function getReminderById(profileId, reminderId) {
     return data;
 }
 
-async function createReminder(profileId, { title, remindAt, entityType, entityId }) {
+async function createReminder(profileId, { title, remind_at, entity_type, entity_id }) {
     const { data, error } = await supabase
         .from('reminders')
         .insert({
             profile_id: profileId,
             title,
-            remind_at: remindAt,
-            entity_type: entityType ?? null,
-            entity_id: entityId ?? null,
+            remind_at: remind_at,
+            entity_type: entity_type ?? null,
+            entity_id: entity_id ?? null,
         })
         .select()
         .single();

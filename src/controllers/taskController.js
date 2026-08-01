@@ -35,7 +35,11 @@ async function getTask(req, res) {
 }
 
 async function createTask(req, res) {
-    const { title, description, urgent, important, dueAt } = req.body;
+    // due_at now matches the update endpoint's field name (and the DB
+    // column) — previously this was `dueAt` (camelCase) here while
+    // updateTask used `due_at` (snake_case), same resource, two
+    // different conventions depending on which endpoint you hit.
+    const { title, description, urgent, important, due_at } = req.body;
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title is required.' });
@@ -47,7 +51,7 @@ async function createTask(req, res) {
             description,
             urgent,
             important,
-            dueAt,
+            due_at,
         });
         return res.status(201).json({ task });
     } catch (err) {

@@ -90,10 +90,10 @@ async function deleteNote(req, res) {
 
 // Converts a note into a task. Two writes, in order:
 // 1. Create the task from the note's content
-// 2. Write the new task's id back onto the note (converted_task_id)
-// If step 2 fails after step 1 succeeds, the task exists but the note
-// won't show "converted" — a known limitation without DB transactions.
-// Same tradeoff as task soft-delete + bin_entries dual-write.
+// 2. Write the new task's id back onto the note (converted_task_id) —
+//    this write is conditional (WHERE converted_task_id IS NULL), so if
+//    a concurrent request already converted this note between our check
+//    and now, this write fails cleanly instead of silently overwriting it.
 async function convertNoteToTask(req, res) {
     try {
         const note = await noteService.getNoteById(req.profileId, req.params.id);
@@ -122,6 +122,19 @@ async function convertNoteToTask(req, res) {
             note.id,
             task.id
         );
+
+        if (!updatedNote) {
+            // Lost the race — someone else converted this note between our
+            // check above and this write. Clean up the orphan task we just
+            // created rather than leaving a duplicate, untethered task behind.
+            await taskService.hardDeleteTask(req.profileId, task.id);
+
+            const currentNote = await noteService.getNoteById(req.profileId, note.id);
+            return res.status(409).json({
+                error: 'This note has already been converted to a task.',
+                taskId: currentNote?.converted_task_id ?? null,
+            });
+        }
 
         return res.status(201).json({ task, note: updatedNote });
     } catch (err) {

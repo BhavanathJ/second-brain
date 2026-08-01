@@ -52,7 +52,15 @@ async function restoreEntry(req, res) {
             return res.status(400).json({ error: `Cannot restore entity_type: ${entry.entity_type}` });
         }
 
-        await handler.restore(req.profileId, entry.entity_id);
+        // restore() returns null if the underlying row is already gone
+        // (hard-deleted elsewhere). Don't remove the bin entry in that
+        // case — that would silently "lose" the item with a 200 response
+        // even though nothing was actually restored.
+        const restored = await handler.restore(req.profileId, entry.entity_id);
+        if (!restored) {
+            return res.status(404).json({ error: 'The original item no longer exists and cannot be restored.' });
+        }
+
         await binService.removeBinEntry(req.profileId, entry.id);
 
         return res.status(200).json({ message: 'Restored successfully.', entityType: entry.entity_type });

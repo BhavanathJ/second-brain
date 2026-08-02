@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reminders — Second Brain</title>
+    <script>
+        (function () {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="../css/app.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app-nav"></div>
+
+    <main class="reminders-page">
+        <div class="tasks-toolbar">
+            <h1 class="h4 mb-0">Reminders</h1>
+            <button class="btn btn-primary btn-sm" id="addReminderBtn">+ Add Reminder</button>
+        </div>
+
+        <div class="dash-card">
+            <div class="dash-section-title">Pending</div>
+            <div id="pendingList"></div>
+        </div>
+
+        <div class="dash-card">
+            <div class="dash-section-title">Done</div>
+            <div id="doneList"></div>
+        </div>
+    </main>
+
+    <div class="modal fade" id="reminderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="reminderForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="reminderModalTitle">Add Reminder</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="reminderId" />
+                        <div class="mb-3">
+                            <label class="form-label" for="reminderTitle">Title</label>
+                            <input type="text" class="form-control" id="reminderTitle" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="reminderRemindAt">Remind at</label>
+                            <input type="datetime-local" class="form-control" id="reminderRemindAt" required />
+                            <div class="form-text">Interpreted in your browser's local timezone.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="../js/pages/reminders.js"></script>
+</body>
+
+</html>

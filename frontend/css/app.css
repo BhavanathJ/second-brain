@@ -527,3 +527,308 @@ a:hover {
     font-size: 0.75rem;
     padding: 0.15rem 0.5rem;
 }
+
+/* ===== Calendar page ===== */
+.calendar-page {
+    padding: 1.5rem 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.cal-month-label {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.35rem;
+    margin-bottom: 1.5rem;
+}
+
+.cal-weekday {
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    padding-bottom: 0.25rem;
+}
+
+.cal-day-cell {
+    min-height: 64px;
+    border: 1px solid var(--sb-border);
+    border-radius: 6px;
+    padding: 0.3rem;
+    cursor: pointer;
+    background: var(--sb-surface);
+    font-size: 0.78rem;
+}
+
+.cal-day-cell:hover {
+    border-color: var(--sb-accent);
+}
+
+.cal-day-cell.empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+}
+
+.cal-day-cell.today {
+    border-color: var(--sb-accent);
+    border-width: 2px;
+}
+
+.cal-day-cell.selected {
+    background: var(--sb-bg);
+    border-color: var(--sb-accent);
+}
+
+.cal-day-number {
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+}
+
+.cal-day-dots {
+    display: flex;
+    gap: 0.2rem;
+    flex-wrap: wrap;
+}
+
+.cal-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.cal-dot.task {
+    background: #f59e0b;
+}
+
+.cal-dot.event {
+    background: #6366f1;
+}
+
+.cal-dot.reminder {
+    background: #ef4444;
+}
+
+.cal-dot.habit {
+    background: var(--sb-accent);
+}
+
+.cal-day-panel {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.cal-panel-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--sb-border);
+    font-size: 0.88rem;
+}
+
+.cal-panel-item:last-child {
+    border-bottom: none;
+}
+
+.cal-panel-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    color: #fff;
+}
+
+.cal-panel-badge.task {
+    background: #f59e0b;
+}
+
+.cal-panel-badge.event {
+    background: #6366f1;
+}
+
+.cal-panel-badge.reminder {
+    background: #ef4444;
+}
+
+.cal-panel-badge.habit {
+    background: var(--sb-accent);
+}
+
+/* ===== Reminders page ===== */
+.reminders-page {
+    padding: 1.5rem 1rem;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.reminder-filter {
+    margin-bottom: 1.25rem;
+}
+
+.reminder-item {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.reminder-item.done .reminder-title {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.reminder-body {
+    flex: 1;
+}
+
+.reminder-title {
+    font-size: 0.92rem;
+    font-weight: 500;
+}
+
+.reminder-time {
+    font-family: var(--sb-mono);
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.reminder-actions {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.reminder-actions button {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+}
+
+/* ===== Bin page ===== */
+.bin-page {
+    padding: 1.5rem 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.bin-item {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.bin-item-body {
+    flex: 1;
+}
+
+.bin-item-label {
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
+}
+
+.bin-item-meta {
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.bin-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.bin-badge.task {
+    background: #f59e0b;
+}
+
+.bin-badge.calendar_event {
+    background: #6366f1;
+}
+
+.bin-badge.reminder {
+    background: #ef4444;
+}
+
+.bin-badge.habit {
+    background: var(--sb-accent);
+}
+
+.bin-badge.note {
+    background: #ec4899;
+}
+
+.bin-item-actions {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.bin-item-actions button {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+}
+
+/* ===== Settings page ===== */
+.settings-page {
+    padding: 1.5rem 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.settings-card {
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.settings-save-msg {
+    font-size: 0.85rem;
+    color: var(--sb-accent);
+    margin-top: 0.5rem;
+    display: none;
+}
+
+.settings-save-msg.visible {
+    display: block;
+}
+
+.profile-list-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--sb-border);
+    font-size: 0.88rem;
+}
+
+.profile-list-item:last-child {
+    border-bottom: none;
+}

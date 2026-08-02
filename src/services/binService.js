@@ -1,5 +1,13 @@
 const supabase = require('../config/supabase');
 
+const ENTITY_LABEL_CONFIG = {
+    task: { table: 'tasks', column: 'title' },
+    note: { table: 'notes', column: 'content' },
+    habit: { table: 'habits', column: 'title' },
+    reminder: { table: 'reminders', column: 'title' },
+    calendar_event: { table: 'calendar_events', column: 'title' },
+};
+
 async function logDeletion(profileId, entityType, entityId) {
     const { error } = await supabase
         .from('bin_entries')
@@ -8,6 +16,11 @@ async function logDeletion(profileId, entityType, entityId) {
     if (error) throw error;
 }
 
+// bin_entries only stores entity_type/entity_id — not the entity's own
+// title/content — so this batches a second query per entity_type to
+// fetch a human-readable label for each entry. Soft-deleted rows still
+// exist in their original table (deleted_at set, row not removed), so
+// this reads them directly, no special "trash" storage involved.
 async function listBinEntries(profileId) {
     const { data, error } = await supabase
         .from('bin_entries')
@@ -16,7 +29,37 @@ async function listBinEntries(profileId) {
         .order('deleted_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+
+    const grouped = {};
+    for (const entry of data) {
+        if (!grouped[entry.entity_type]) grouped[entry.entity_type] = [];
+        grouped[entry.entity_type].push(entry.entity_id);
+    }
+
+    const labelMap = {};
+
+    await Promise.all(
+        Object.entries(grouped).map(async ([entityType, ids]) => {
+            const config = ENTITY_LABEL_CONFIG[entityType];
+            if (!config) return;
+            const { data: rows, error: rowsError } = await supabase
+                .from(config.table)
+                .select(`id, ${config.column}`)
+                .in('id', ids);
+            if (rowsError) throw rowsError;
+            rows.forEach(row => {
+                labelMap[row.id] = row[config.column];
+            });
+        })
+    );
+
+    return data.map(entry => ({
+        ...entry,
+        // Truncate — notes' content can be long, titles rarely are.
+        // Falls back gracefully if the underlying row is somehow gone
+        // (e.g. a race with the purge cron) rather than showing undefined.
+        label: (labelMap[entry.entity_id] ?? '(content unavailable)').slice(0, 100),
+    }));
 }
 
 async function getBinEntryById(profileId, binEntryId) {

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bin — Second Brain</title>
+    <script>
+        (function () {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="../css/app.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app-nav"></div>
+
+    <main class="bin-page">
+        <h1 class="h4 mb-3">Bin</h1>
+        <p class="text-muted small mb-3">Items are permanently deleted 30 days after being moved here.</p>
+        <div id="binList"></div>
+    </main>
+
+    <script type="module" src="../js/pages/bin.js"></script>
+</body>
+
+</html>

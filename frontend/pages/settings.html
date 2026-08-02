@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings — Second Brain</title>
+    <script>
+        (function () {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="../css/app.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app-nav"></div>
+
+    <main class="settings-page">
+        <h1 class="h4 mb-3">Settings</h1>
+
+        <div class="settings-card">
+            <form id="settingsForm">
+                <div class="mb-3">
+                    <label class="form-label" for="timezoneSelect">Timezone</label>
+                    <select class="form-select" id="timezoneSelect"></select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="themeSelect">Theme</label>
+                    <select class="form-select" id="themeSelect">
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="weekStartSelect">Week starts on</label>
+                    <select class="form-select" id="weekStartSelect">
+                        <option value="0">Sunday</option>
+                        <option value="1">Monday</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                <div class="settings-save-msg" id="saveMsg">Saved.</div>
+            </form>
+        </div>
+
+        <div class="settings-card">
+            <div class="dash-section-title">Profiles</div>
+            <div id="profilesList"></div>
+            <form id="addProfileForm" class="d-flex gap-2 mt-3">
+                <input type="text" class="form-control form-control-sm" id="newProfileName"
+                    placeholder="New profile name" required />
+                <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">+ Add Profile</button>
+            </form>
+            <div class="form-text mt-2">Renaming and deleting profiles isn't available yet. Max 5 profiles per account.
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="../js/pages/settings.js"></script>
+</body>
+
+</html>

@@ -1,5 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
+import { showToast } from '../toast.js';
+import { confirmAction } from '../confirmDialog.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -7,10 +9,6 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Correct way to get a local calendar date string for an arbitrary
-// timezone in the browser — Intl with an explicit timeZone, not a
-// naive `new Date()` guess. Same principle the backend's profileTime.js
-// uses, just via the browser's built-in Intl instead of manual offset math.
 function getLocalDateString(timeZone, date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
@@ -28,7 +26,7 @@ function dayLabel(dateStr) {
 
 let timeZone = 'UTC';
 let habits = [];
-let last7Days = []; // oldest -> newest, includes today
+let last7Days = [];
 const modalEl = document.getElementById('habitModal');
 const modal = new bootstrap.Modal(modalEl);
 
@@ -110,7 +108,7 @@ function wireEvents() {
                 }
                 await loadHabits();
             } catch (err) {
-                alert('Failed to update log: ' + err.message);
+                showToast('Failed to update log: ' + err.message);
             }
         });
     });
@@ -121,12 +119,14 @@ function wireEvents() {
 
     document.querySelectorAll('.habit-delete-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (!confirm('Move this habit to Bin? Its history will be kept.')) return;
+            const ok = await confirmAction('Move this habit to Bin? Its history will be kept.');
+            if (!ok) return;
             try {
                 await apiFetch(`/habits/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Habit moved to Bin', 'success');
                 await loadHabits();
             } catch (err) {
-                alert('Failed to delete habit: ' + err.message);
+                showToast('Failed to delete habit: ' + err.message);
             }
         });
     });
@@ -167,9 +167,10 @@ async function handleSubmit(e) {
             await apiFetch('/habits', { method: 'POST', body: JSON.stringify(payload) });
         }
         modal.hide();
+        showToast('Habit saved', 'success');
         await loadHabits();
     } catch (err) {
-        alert('Failed to save habit: ' + err.message);
+        showToast('Failed to save habit: ' + err.message);
     }
 }
 

@@ -1,5 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
+import { showToast } from '../toast.js';
+import { confirmAction } from '../confirmDialog.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -81,7 +83,7 @@ function wireItemEvents() {
                 });
                 await loadTasks();
             } catch (err) {
-                alert('Failed to update task: ' + err.message);
+                showToast('Failed to update task: ' + err.message);
                 cb.disabled = false;
             }
         });
@@ -93,27 +95,24 @@ function wireItemEvents() {
 
     document.querySelectorAll('.task-delete-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (!confirm('Move this task to Bin?')) return;
+            const ok = await confirmAction('Move this task to Bin?');
+            if (!ok) return;
             try {
                 await apiFetch(`/tasks/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Task moved to Bin', 'success');
                 await loadTasks();
             } catch (err) {
-                alert('Failed to delete task: ' + err.message);
+                showToast('Failed to delete task: ' + err.message);
             }
         });
     });
 }
 
-// Converts a datetime-local input value ("YYYY-MM-DDTHH:mm") to an ISO
-// string. Interpreted in the BROWSER's local timezone (native input
-// limitation) — not necessarily the profile's configured timezone.
 function localInputToISO(value) {
     if (!value) return null;
     return new Date(value).toISOString();
 }
 
-// Converts an ISO string to the "YYYY-MM-DDTHH:mm" format the
-// datetime-local input expects, in the browser's local timezone.
 function isoToLocalInput(isoString) {
     if (!isoString) return '';
     const d = new Date(isoString);
@@ -162,9 +161,10 @@ async function handleSubmit(e) {
             await apiFetch('/tasks', { method: 'POST', body: JSON.stringify(payload) });
         }
         modal.hide();
+        showToast('Task saved', 'success');
         await loadTasks();
     } catch (err) {
-        alert('Failed to save task: ' + err.message);
+        showToast('Failed to save task: ' + err.message);
     }
 }
 

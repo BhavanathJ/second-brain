@@ -1,5 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
+import { showToast } from '../toast.js';
+import { confirmAction } from '../confirmDialog.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -61,12 +63,14 @@ function wireItemEvents() {
 
     document.querySelectorAll('.note-delete-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (!confirm('Move this note to Bin?')) return;
+            const ok = await confirmAction('Move this note to Bin?');
+            if (!ok) return;
             try {
                 await apiFetch(`/notes/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Note moved to Bin', 'success');
                 await loadNotes(currentFilterTags());
             } catch (err) {
-                alert('Failed to delete note: ' + err.message);
+                showToast('Failed to delete note: ' + err.message);
             }
         });
     });
@@ -76,10 +80,11 @@ function wireItemEvents() {
             btn.disabled = true;
             try {
                 await apiFetch(`/notes/${btn.dataset.id}/convert`, { method: 'POST' });
+                showToast('Converted to task', 'success');
                 await loadNotes(currentFilterTags());
             } catch (err) {
                 // 409 = already converted (e.g. by another tab) — refresh to show the real state
-                alert(err.message);
+                showToast(err.message);
                 await loadNotes(currentFilterTags());
             }
         });
@@ -105,9 +110,10 @@ async function handleEditSubmit(e) {
     try {
         await apiFetch(`/notes/${noteId}`, { method: 'PATCH', body: JSON.stringify(payload) });
         editModal.hide();
+        showToast('Note saved', 'success');
         await loadNotes(currentFilterTags());
     } catch (err) {
-        alert('Failed to save note: ' + err.message);
+        showToast('Failed to save note: ' + err.message);
     }
 }
 
@@ -119,9 +125,10 @@ async function handleCaptureSubmit(e) {
     try {
         await apiFetch('/notes', { method: 'POST', body: JSON.stringify({ content, tags }) });
         document.getElementById('captureForm').reset();
+        showToast('Note captured', 'success');
         await loadNotes(currentFilterTags());
     } catch (err) {
-        alert('Failed to save note: ' + err.message);
+        showToast('Failed to save note: ' + err.message);
     }
 }
 

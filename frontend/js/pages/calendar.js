@@ -1,5 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
+import { showToast } from '../toast.js';
+import { confirmAction } from '../confirmDialog.js';
 import {
     getLocalDateString, addDays, addMonths,
     getLocalMonthBounds, getLocalWeekBounds, getLocalDayBounds,
@@ -21,8 +23,8 @@ function labelForDate(dateStr, opts) {
 
 let timeZone = 'UTC';
 let weekStartsOn = 0;
-let viewMode = 'month'; // 'month' | 'week' | 'day'
-let anchorDateStr;      // the date view navigation is centered on
+let viewMode = 'month';
+let anchorDateStr;
 let itemsByDate = new Map();
 let selectedDateStr = null;
 const modalEl = document.getElementById('eventModal');
@@ -46,7 +48,7 @@ function bucketData(data) {
         addItem(getLocalDateString(timeZone, new Date(r.remind_at)), 'reminders', r);
     });
     data.habitLogs.forEach(l => {
-        addItem(l.log_date, 'habits', l); // log_date is already a plain date string
+        addItem(l.log_date, 'habits', l);
     });
 
     return map;
@@ -114,7 +116,7 @@ function wireDayCellClicks() {
     document.querySelectorAll('.cal-day-cell:not(.empty)').forEach(cell => {
         cell.addEventListener('click', () => {
             selectedDateStr = cell.dataset.date;
-            renderCurrentView(); // re-render to move the .selected highlight + update panel
+            renderCurrentView();
         });
     });
 }
@@ -130,10 +132,10 @@ function renderDayPanel() {
     const label = labelForDate(selectedDateStr, { weekday: 'long', month: 'long', day: 'numeric' });
 
     const rows = items ? [
-        ...items.tasks.map(t => ({ badge: 'task', title: t.title, time: t.due_at ? formatTime(t.due_at, timeZone) : '' })),
-        ...items.events.map(e => ({ badge: 'event', title: e.title, time: formatTime(e.starts_at, timeZone) })),
-        ...items.reminders.map(r => ({ badge: 'reminder', title: r.title, time: formatTime(r.remind_at, timeZone) })),
-        ...items.habits.map(h => ({ badge: 'habit', title: h.habits?.title ?? 'Habit', time: '✓ done' })),
+        ...items.tasks.map(t => ({ badge: 'task', title: t.title, time: t.due_at ? formatTime(t.due_at, timeZone) : '', deletable: false })),
+        ...items.events.map(e => ({ badge: 'event', title: e.title, time: formatTime(e.starts_at, timeZone), deletable: true, id: e.id })),
+        ...items.reminders.map(r => ({ badge: 'reminder', title: r.title, time: formatTime(r.remind_at, timeZone), deletable: false })),
+        ...items.habits.map(h => ({ badge: 'habit', title: h.habits?.title ?? 'Habit', time: '✓ done', deletable: false })),
     ] : [];
 
     panel.innerHTML = `
@@ -143,9 +145,29 @@ function renderDayPanel() {
         <span class="cal-panel-badge ${r.badge}">${r.badge}</span>
         <span class="flex-grow-1">${escapeHtml(r.title)}</span>
         <span class="dash-item-time">${r.time}</span>
+        ${r.deletable ? `<button class="btn btn-outline-danger btn-sm cal-event-delete-btn" data-id="${r.id}">Delete</button>` : ''}
       </div>
     `).join('')}
   `;
+
+    wireDeleteButtons();
+}
+
+function wireDeleteButtons() {
+    document.querySelectorAll('.cal-event-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const ok = await confirmAction('Delete this calendar event?');
+            if (!ok) return;
+            try {
+                await apiFetch(`/calendar-events/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Event deleted', 'success');
+                await loadView();
+            } catch (err) {
+                showToast('Failed to delete event: ' + err.message);
+            }
+        });
+    });
 }
 
 function renderCurrentView() {
@@ -158,7 +180,6 @@ function renderCurrentView() {
         document.getElementById('periodLabel').textContent =
             `${labelForDate(weekStartStr, { month: 'short', day: 'numeric' })} – ${labelForDate(weekEndStr, { month: 'short', day: 'numeric', year: 'numeric' })}`;
     } else {
-        // Day view: no grid, the day panel IS the view, always showing anchorDateStr.
         document.getElementById('calGrid').innerHTML = '';
         selectedDateStr = anchorDateStr;
         document.getElementById('periodLabel').textContent = labelForDate(anchorDateStr, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -184,7 +205,7 @@ function navigate(delta) {
     else if (viewMode === 'week') anchorDateStr = addDays(anchorDateStr, delta * 7);
     else anchorDateStr = addDays(anchorDateStr, delta);
 
-    if (viewMode !== 'day') selectedDateStr = null; // clear selection on nav, except day view (always self-selected)
+    if (viewMode !== 'day') selectedDateStr = null;
     loadView();
 }
 
@@ -210,9 +231,10 @@ async function handleEventSubmit(e) {
         await apiFetch('/calendar-events', { method: 'POST', body: JSON.stringify(payload) });
         modal.hide();
         document.getElementById('eventForm').reset();
+        showToast('Event saved', 'success');
         await loadView();
     } catch (err) {
-        alert('Failed to save event: ' + err.message);
+        showToast('Failed to save event: ' + err.message);
     }
 }
 
@@ -229,6 +251,7 @@ async function main() {
     }
 
     anchorDateStr = getLocalDateString(timeZone);
+    selectedDateStr = anchorDateStr; // auto-select today on initial load, in every view mode
 
     document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
     document.getElementById('nextBtn').addEventListener('click', () => navigate(1));

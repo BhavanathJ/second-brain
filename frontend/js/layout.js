@@ -1,4 +1,5 @@
 import { apiFetch } from './api.js';
+import { showToast } from './toast.js';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'dashboard.html', page: 'dashboard' },
@@ -11,10 +12,6 @@ const NAV_ITEMS = [
     { label: 'Settings', href: 'settings.html', page: 'settings' },
 ];
 
-// Decodes the JWT payload WITHOUT verifying the signature — fine here,
-// this is only ever used to read display info (which profile is active)
-// from a token the browser already trusts because it just used it
-// successfully. Never treat this as a security check.
 function decodeAccessToken() {
     const token = localStorage.getItem('accessToken');
     if (!token) return null;
@@ -84,16 +81,13 @@ async function populateProfileSwitcher(currentProfileId) {
             const data = await apiFetch(`/profiles/${newProfileId}/select`, { method: 'POST' });
             localStorage.setItem('accessToken', data.accessToken);
             localStorage.setItem('refreshToken', data.refreshToken);
-            window.location.reload(); // full reload — simplest way to refresh every profile-scoped view at once
+            window.location.reload();
         } catch (err) {
-            alert('Failed to switch profile: ' + err.message);
+            showToast('Failed to switch profile: ' + err.message);
         }
     });
 }
 
-// Applies theme to the DOM AND caches it in localStorage — the cache is
-// what the inline <head> script reads on the NEXT page load, before
-// this file even finishes loading, to avoid a flash of the wrong theme.
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
@@ -101,16 +95,11 @@ function applyTheme(theme) {
 
 async function initThemeToggle() {
     const btn = document.getElementById('themeToggle');
-    // Inline <head> script already applied the cached theme before paint —
-    // this just keeps `currentTheme` in sync for the click handler below.
     let currentTheme = localStorage.getItem('theme') || 'light';
 
     try {
         const { settings } = await apiFetch('/settings');
         if (settings.theme !== currentTheme) {
-            // Server disagrees with the cache (e.g. theme was changed on
-            // another device/profile) — correct it, but this is now a rare
-            // late correction, not the default first-load behavior.
             currentTheme = settings.theme;
             applyTheme(currentTheme);
         }
@@ -149,9 +138,6 @@ function initLogout() {
     });
 }
 
-// Call once per page, right after DOM is ready. Requires a
-// <div id="app-nav"></div> at the top of <body>.
-// activePage matches one of NAV_ITEMS' `page` values, for highlighting.
 export async function initLayout(activePage) {
     if (!requireAuthGuard()) return null;
 

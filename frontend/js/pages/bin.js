@@ -1,5 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
+import { showToast } from '../toast.js';
+import { confirmAction } from '../confirmDialog.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -56,11 +58,12 @@ function wireEvents() {
             btn.disabled = true;
             try {
                 await apiFetch(`/bin/${btn.dataset.id}/restore`, { method: 'POST' });
+                showToast('Restored', 'success');
                 await loadBin();
             } catch (err) {
                 // A 404 here specifically means the original item was already
                 // hard-deleted elsewhere — the backend guard from earlier.
-                alert('Failed to restore: ' + err.message);
+                showToast('Failed to restore: ' + err.message);
                 btn.disabled = false;
             }
         });
@@ -68,12 +71,14 @@ function wireEvents() {
 
     document.querySelectorAll('.bin-delete-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (!confirm('Permanently delete this item? This cannot be undone.')) return;
+            const ok = await confirmAction('Permanently delete this item? This cannot be undone.');
+            if (!ok) return;
             try {
                 await apiFetch(`/bin/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Deleted permanently', 'success');
                 await loadBin();
             } catch (err) {
-                alert('Failed to delete: ' + err.message);
+                showToast('Failed to delete: ' + err.message);
             }
         });
     });

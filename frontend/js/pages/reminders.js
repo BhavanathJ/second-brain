@@ -1,5 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
+import { showToast } from '../toast.js';
+import { confirmAction } from '../confirmDialog.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -76,7 +78,7 @@ function wireItemEvents() {
                 });
                 await loadReminders();
             } catch (err) {
-                alert('Failed to update reminder: ' + err.message);
+                showToast('Failed to update reminder: ' + err.message);
                 btn.disabled = false;
             }
         });
@@ -88,12 +90,14 @@ function wireItemEvents() {
 
     document.querySelectorAll('.reminder-delete-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (!confirm('Move this reminder to Bin?')) return;
+            const ok = await confirmAction('Move this reminder to Bin?');
+            if (!ok) return;
             try {
                 await apiFetch(`/reminders/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Reminder moved to Bin', 'success');
                 await loadReminders();
             } catch (err) {
-                alert('Failed to delete reminder: ' + err.message);
+                showToast('Failed to delete reminder: ' + err.message);
             }
         });
     });
@@ -133,9 +137,10 @@ async function handleSubmit(e) {
             await apiFetch('/reminders', { method: 'POST', body: JSON.stringify(payload) });
         }
         modal.hide();
+        showToast('Reminder saved', 'success');
         await loadReminders();
     } catch (err) {
-        alert('Failed to save reminder: ' + err.message);
+        showToast('Failed to save reminder: ' + err.message);
     }
 }
 

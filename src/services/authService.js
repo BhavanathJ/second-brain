@@ -11,6 +11,17 @@ async function findUserByEmail(email) {
     return data;
 }
 
+async function findUserById(userId) {
+    const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 async function createUser({ email, passwordHash }) {
     const { data, error } = await supabase
         .from('users')
@@ -20,6 +31,15 @@ async function createUser({ email, passwordHash }) {
 
     if (error) throw error;
     return data;
+}
+
+async function updatePassword(userId, newPasswordHash) {
+    const { error } = await supabase
+        .from('users')
+        .update({ password_hash: newPasswordHash })
+        .eq('id', userId);
+
+    if (error) throw error;
 }
 
 async function createDefaultProfile(userId) {
@@ -87,13 +107,30 @@ async function revokeRefreshToken(tokenHash) {
     if (error) throw error;
 }
 
+// Revokes every active refresh token belonging to this user — every
+// device, every profile. Used on password change: an attacker holding
+// a stolen refresh token gets logged out the moment the real owner
+// changes their password, not left with a still-working session.
+async function revokeAllRefreshTokensForUser(userId) {
+    const { error } = await supabase
+        .from('refresh_tokens')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .is('revoked_at', null);
+
+    if (error) throw error;
+}
+
 module.exports = {
     findUserByEmail,
+    findUserById,
     createUser,
+    updatePassword,
     createDefaultProfile,
     findProfileById,
     findDefaultProfileForUser,
     storeRefreshToken,
     findActiveRefreshToken,
+    revokeAllRefreshTokensForUser,
     revokeRefreshToken,
 };

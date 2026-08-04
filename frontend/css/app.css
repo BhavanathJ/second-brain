@@ -876,3 +876,59 @@ a:hover {
 .toast-item.toast-info {
     border-left-color: #6366f1;
 }
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dash-item,
+.task-item,
+.habit-card,
+.note-card,
+.reminder-item,
+.bin-item,
+.cal-panel-item {
+    animation: fadeInUp 0.25s ease;
+}
+
+/* ===== Card hover lift ===== */
+.dash-card,
+.task-item,
+.habit-card,
+.note-card,
+.reminder-item,
+.bin-item,
+.quadrant,
+.settings-card,
+.cal-day-cell:not(.empty) {
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.dash-card:hover,
+.task-item:hover,
+.habit-card:hover,
+.note-card:hover,
+.reminder-item:hover,
+.bin-item:hover,
+.settings-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .dash-card:hover,
+[data-theme="dark"] .task-item:hover,
+[data-theme="dark"] .habit-card:hover,
+[data-theme="dark"] .note-card:hover,
+[data-theme="dark"] .reminder-item:hover,
+[data-theme="dark"] .bin-item:hover,
+[data-theme="dark"] .settings-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}

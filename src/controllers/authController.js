@@ -135,4 +135,45 @@ async function logout(req, res) {
   }
 }
 
-module.exports = { signup, login, refresh, logout, issueTokenPair };
+// Changes the logged-in user's password. Requires the CURRENT password
+// (not just a valid session) — prevents someone who's grabbed an
+// unlocked, logged-in browser from locking the real owner out by
+// silently changing the password with no proof of knowing the old one.
+//
+// On success, revokes every refresh token for this user (all devices,
+// all profiles) — see revokeAllRefreshTokensForUser for why. The
+// current request's own tokens are NOT reissued here; the frontend
+// must log the user back in with the new password.
+async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required.' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+  }
+
+  try {
+    const user = await authService.findUserById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const currentMatches = await comparePassword(currentPassword, user.password_hash);
+    if (!currentMatches) {
+      return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+
+    const newPasswordHash = await hashPassword(newPassword);
+    await authService.updatePassword(req.userId, newPasswordHash);
+    await authService.revokeAllRefreshTokensForUser(req.userId);
+
+    return res.status(200).json({ message: 'Password changed. Please log in again.' });
+  } catch (err) {
+    console.error('Change password error:', err);
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+}
+
+module.exports = { signup, login, refresh, logout, changePassword, issueTokenPair };

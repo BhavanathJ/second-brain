@@ -1,5 +1,6 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
+import { showToast } from '../toast.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -51,7 +52,7 @@ async function handleSubmit(e) {
         msg.classList.add('visible');
         setTimeout(() => msg.classList.remove('visible'), 2000);
     } catch (err) {
-        alert('Failed to save settings: ' + err.message);
+        showToast('Failed to save settings: ' + err.message);
     }
 }
 
@@ -64,12 +65,9 @@ async function handleAddProfile(e) {
     try {
         await apiFetch('/profiles', { method: 'POST', body: JSON.stringify({ name }) });
         nameInput.value = '';
-        // Full reload — simplest way to also refresh the navbar's profile
-        // switcher (layout.js populates it fresh on every page load), rather
-        // than reaching into another module's DOM to patch it in place.
         window.location.reload();
     } catch (err) {
-        alert('Failed to create profile: ' + err.message);
+        showToast('Failed to create profile: ' + err.message);
     }
 }
 

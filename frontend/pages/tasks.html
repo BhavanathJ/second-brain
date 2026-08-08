@@ -6,11 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tasks — Second Brain</title>
     <script>
-        // Applies the cached theme BEFORE first paint, so there's no flash of
-        // the wrong theme while layout.js's async settings fetch is in flight.
         (function () {
-            var theme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', theme);
+            var pref = localStorage.getItem('theme') || 'system';
+            var resolved = pref === 'system'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : pref;
+            document.documentElement.setAttribute('data-theme', resolved);
         })();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />

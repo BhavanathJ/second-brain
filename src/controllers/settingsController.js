@@ -1,6 +1,6 @@
 const settingsService = require('../services/settingsService');
 
-const VALID_THEMES = ['light', 'dark'];
+const VALID_THEMES = ['light', 'dark', 'system'];
 const VALID_WEEK_STARTS = [0, 1]; // 0 = Sunday, 1 = Monday
 const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'));
 

@@ -1,5 +1,28 @@
 import { apiFetch } from './api.js';
 
+// --- Pre-login theme selector (localStorage only — no /settings to fetch from yet) ---
+const themeSelect = document.getElementById('preLoginThemeSelect');
+themeSelect.value = localStorage.getItem('theme') || 'system';
+
+themeSelect.addEventListener('change', () => {
+    const pref = themeSelect.value;
+    localStorage.setItem('theme', pref);
+    const resolved = pref === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : pref;
+    document.documentElement.setAttribute('data-theme', resolved);
+});
+
+// --- Show/hide password toggles — works for any field via data-target ---
+document.querySelectorAll('.toggle-password-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        const field = document.getElementById(btn.dataset.target);
+        const isHidden = field.type === 'password';
+        field.type = isHidden ? 'text' : 'password';
+        btn.textContent = isHidden ? 'Hide' : 'Show';
+    });
+});
+
 // --- Tab switching ---
 const tabs = document.querySelectorAll('.auth-tab');
 const loginForm = document.getElementById('loginForm');
@@ -20,7 +43,7 @@ tabs.forEach((tab) => {
 function handleAuthSuccess(data) {
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('refreshToken', data.refreshToken);
-    window.location.href = 'pages/dashboard.html'; // doesn't exist yet — placeholder target
+    window.location.href = 'pages/dashboard.html';
 }
 
 function showError(el, message) {
@@ -45,6 +68,9 @@ loginForm.addEventListener('submit', async (e) => {
         handleAuthSuccess(data);
     } catch (err) {
         showError(errorEl, err.message || 'Login failed.');
+        const passwordField = document.getElementById('loginPassword');
+        passwordField.value = '';
+        passwordField.focus();
     }
 });
 
@@ -56,6 +82,12 @@ signupForm.addEventListener('submit', async (e) => {
 
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
+    const confirmPassword = document.getElementById('signupConfirmPassword').value;
+
+    if (password !== confirmPassword) {
+        showError(errorEl, 'Passwords do not match.');
+        return;
+    }
 
     try {
         const data = await apiFetch('/auth/signup', {

@@ -1,5 +1,6 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
+import { resolveTheme, watchSystemTheme } from './themeUtils.js';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'dashboard.html', page: 'dashboard' },
@@ -52,7 +53,11 @@ function renderNavHTML(activePage) {
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">${links}</ul>
           <div class="d-flex align-items-center gap-2">
             <select id="profileSwitcher" class="form-select form-select-sm app-profile-select" aria-label="Active profile"></select>
-            <button id="themeToggle" class="btn btn-sm btn-outline-secondary" type="button" title="Toggle theme">🌓</button>
+            <select id="themeSelect" class="form-select form-select-sm app-theme-select" aria-label="Theme" title="Theme">
+              <option value="light">☀️ Light</option>
+              <option value="dark">🌙 Dark</option>
+              <option value="system">🖥️ System</option>
+            </select>
             <button id="logoutBtn" class="btn btn-sm btn-outline-danger" type="button">Log out</button>
           </div>
         </div>
@@ -88,32 +93,48 @@ async function populateProfileSwitcher(currentProfileId) {
     });
 }
 
-function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+// Applies the RESOLVED theme ('light'/'dark') to the DOM, and caches
+// the RAW preference ('light'/'dark'/'system') in localStorage — the
+// cache is what every page's pre-paint <head> script reads before
+// this file even loads, to avoid a flash of the wrong theme.
+function applyResolvedTheme(rawPref) {
+    const resolved = resolveTheme(rawPref);
+    document.documentElement.setAttribute('data-theme', resolved);
+    localStorage.setItem('theme', rawPref);
 }
 
-async function initThemeToggle() {
-    const btn = document.getElementById('themeToggle');
-    let currentTheme = localStorage.getItem('theme') || 'light';
+let stopWatchingSystemTheme = null;
+
+async function initThemeSelect() {
+    const select = document.getElementById('themeSelect');
+    let currentPref = localStorage.getItem('theme') || 'system';
+    select.value = currentPref;
 
     try {
         const { settings } = await apiFetch('/settings');
-        if (settings.theme !== currentTheme) {
-            currentTheme = settings.theme;
-            applyTheme(currentTheme);
+        if (settings.theme !== currentPref) {
+            currentPref = settings.theme;
+            select.value = currentPref;
+            applyResolvedTheme(currentPref);
         }
     } catch (err) {
         console.error('Failed to load settings for theme:', err);
     }
 
-    btn.addEventListener('click', async () => {
-        currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-        applyTheme(currentTheme);
+    // Live-update if the OS theme changes while "System" is selected —
+    // only re-applies if currentPref is still 'system' at the time the
+    // OS event fires, so this doesn't fight an explicit Light/Dark choice.
+    stopWatchingSystemTheme = watchSystemTheme(() => {
+        if (currentPref === 'system') applyResolvedTheme('system');
+    });
+
+    select.addEventListener('change', async () => {
+        currentPref = select.value;
+        applyResolvedTheme(currentPref);
         try {
             await apiFetch('/settings', {
                 method: 'PATCH',
-                body: JSON.stringify({ theme: currentTheme }),
+                body: JSON.stringify({ theme: currentPref }),
             });
         } catch (err) {
             console.error('Failed to save theme:', err);
@@ -132,6 +153,7 @@ function initLogout() {
         } catch (err) {
             console.error('Logout request failed, clearing local session anyway:', err);
         } finally {
+            if (stopWatchingSystemTheme) stopWatchingSystemTheme();
             localStorage.clear();
             window.location.href = '../index.html';
         }
@@ -152,7 +174,7 @@ export async function initLayout(activePage) {
     mount.innerHTML = renderNavHTML(activePage);
 
     await populateProfileSwitcher(profileId);
-    await initThemeToggle();
+    await initThemeSelect();
     initLogout();
 
     return { profileId };

@@ -5,6 +5,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Second Brain</title>
+    <script>
+        (function () {
+            var pref = localStorage.getItem('theme') || 'system';
+            var resolved = pref === 'system'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : pref;
+            document.documentElement.setAttribute('data-theme', resolved);
+        })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
@@ -13,7 +22,15 @@
 <body>
     <div class="auth-shell">
         <div class="auth-card">
-            <div class="auth-wordmark">Second<span>Brain</span></div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="auth-wordmark mb-0">Second<span>Brain</span></div>
+                <select id="preLoginThemeSelect" class="form-select form-select-sm" style="width: auto;"
+                    aria-label="Theme" title="Theme">
+                    <option value="light">☀️</option>
+                    <option value="dark">🌙</option>
+                    <option value="system">🖥️</option>
+                </select>
+            </div>
 
             <div class="auth-tabs">
                 <button type="button" class="auth-tab active" data-tab="login">Log in</button>
@@ -27,8 +44,12 @@
                 </div>
                 <div class="mb-3">
                     <label for="loginPassword" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="loginPassword" required
-                        autocomplete="current-password" />
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="loginPassword" required
+                            autocomplete="current-password" />
+                        <button type="button" class="btn btn-outline-secondary toggle-password-btn"
+                            data-target="loginPassword">Show</button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Log in</button>
                 <div class="auth-error" id="loginError"></div>
@@ -41,16 +62,29 @@
                 </div>
                 <div class="mb-3">
                     <label for="signupPassword" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="signupPassword" required autocomplete="new-password"
-                        minlength="8" />
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="signupPassword" required
+                            autocomplete="new-password" minlength="8" />
+                        <button type="button" class="btn btn-outline-secondary toggle-password-btn"
+                            data-target="signupPassword">Show</button>
+                    </div>
                     <div class="form-text">At least 8 characters.</div>
+                </div>
+                <div class="mb-3">
+                    <label for="signupConfirmPassword" class="form-label">Confirm password</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="signupConfirmPassword" required
+                            autocomplete="new-password" minlength="8" />
+                        <button type="button" class="btn btn-outline-secondary toggle-password-btn"
+                            data-target="signupConfirmPassword">Show</button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Create account</button>
                 <div class="auth-error" id="signupError"></div>
             </form>
         </div>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+
     <script type="module" src="js/auth.js"></script>
 </body>
 

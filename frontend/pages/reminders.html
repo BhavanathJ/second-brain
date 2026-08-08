@@ -7,8 +7,11 @@
     <title>Reminders — Second Brain</title>
     <script>
         (function () {
-            var theme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', theme);
+            var pref = localStorage.getItem('theme') || 'system';
+            var resolved = pref === 'system'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : pref;
+            document.documentElement.setAttribute('data-theme', resolved);
         })();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />

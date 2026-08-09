@@ -82,6 +82,17 @@ async function updateReminder(req, res) {
         return res.status(400).json({ error: 'No valid fields to update.' });
     }
 
+    // Unlink consistency: clearing only ONE half of a link would leave the
+    // other half dangling (e.g. PATCH { entity_type: null } on a task-linked
+    // reminder would null the type but orphan the old entity_id). If either
+    // half is explicitly cleared and the other wasn't sent, clear both.
+    if (fields.entity_type === null && fields.entity_id === undefined) {
+        fields.entity_id = null;
+    }
+    if (fields.entity_id === null && fields.entity_type === undefined) {
+        fields.entity_type = null;
+    }
+
     // Same entity_type/entity_id rules as createReminder — keeps create and
     // update consistent, so a PATCH can't orphan a reminder by setting an
     // unbalanced or invalid entity link. An explicit { entity_type: null,

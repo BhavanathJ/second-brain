@@ -115,8 +115,8 @@ function daysBetween(aStr, bStr) {
 
 // The full date range a streak can ever need: the current week plus up to
 // 52 weeks back.
-function getStreakWindow(timeZone, weekStartsOn) {
-    const currentWeekStart = getLocalWeekStartDateString(timeZone, weekStartsOn);
+function getStreakWindow(timeZone, weekStartsOn, now = new Date()) {
+    const currentWeekStart = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
     return {
         windowStart: addDaysToDateString(currentWeekStart, -51 * 7),
         windowEnd: addDaysToDateString(currentWeekStart, 6),
@@ -125,8 +125,8 @@ function getStreakWindow(timeZone, weekStartsOn) {
 
 // ONE query: every completed log date for a profile (optionally filtered
 // to a single habit) across the 52-week streak window. Rows: { habit_id, log_date }.
-async function getCompletedLogs(profileId, timeZone, weekStartsOn, habitId = null) {
-    const { windowStart, windowEnd } = getStreakWindow(timeZone, weekStartsOn);
+async function getCompletedLogs(profileId, timeZone, weekStartsOn, habitId = null, now = new Date()) {
+    const { windowStart, windowEnd } = getStreakWindow(timeZone, weekStartsOn, now);
     let query = supabase
         .from('habit_logs')
         .select('habit_id, log_date')
@@ -160,17 +160,17 @@ function countInWeek(dateSet, weekStartStr) {
     return count;
 }
 
-function weeklyCountForDates(dateSet, timeZone, weekStartsOn) {
-    const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn);
+function weeklyCountForDates(dateSet, timeZone, weekStartsOn, now = new Date()) {
+    const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
     return countInWeek(dateSet, weekStartStr);
 }
 
 // Same streak algorithm as before, but reads from a pre-fetched Set of
 // log dates instead of issuing a Supabase query per week.
-function computeStreakForDates(dateSet, targetPerWeek, timeZone, weekStartsOn) {
+function computeStreakForDates(dateSet, targetPerWeek, timeZone, weekStartsOn, now = new Date()) {
     let streak = 0;
-    let weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn);
-    const todayStr = getLocalDateString(timeZone);
+    let weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
+    const todayStr = getLocalDateString(timeZone, now);
 
     for (let i = 0; i < 52; i++) {
         const weekEndStr = addDaysToDateString(weekStartStr, 6);

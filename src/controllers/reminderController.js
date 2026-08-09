@@ -82,6 +82,33 @@ async function updateReminder(req, res) {
         return res.status(400).json({ error: 'No valid fields to update.' });
     }
 
+    // Unlink consistency: clearing only ONE half of a link would leave the
+    // other half dangling (e.g. PATCH { entity_type: null } on a task-linked
+    // reminder would null the type but orphan the old entity_id). If either
+    // half is explicitly cleared and the other wasn't sent, clear both.
+    if (fields.entity_type === null && fields.entity_id === undefined) {
+        fields.entity_id = null;
+    }
+    if (fields.entity_id === null && fields.entity_type === undefined) {
+        fields.entity_type = null;
+    }
+
+    // Same entity_type/entity_id rules as createReminder — keeps create and
+    // update consistent, so a PATCH can't orphan a reminder by setting an
+    // unbalanced or invalid entity link. An explicit { entity_type: null,
+    // entity_id: null } is allowed and unlinks the reminder.
+    if (fields.entity_type && !fields.entity_id) {
+        return res.status(400).json({ error: 'entity_id is required when entity_type is set.' });
+    }
+    if (fields.entity_id && !fields.entity_type) {
+        return res.status(400).json({ error: 'entity_type is required when entity_id is set.' });
+    }
+    if (fields.entity_type && !VALID_ENTITY_TYPES.includes(fields.entity_type)) {
+        return res.status(400).json({
+            error: `Invalid entity_type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}.`,
+        });
+    }
+
     try {
         const reminder = await reminderService.updateReminder(
             req.profileId,

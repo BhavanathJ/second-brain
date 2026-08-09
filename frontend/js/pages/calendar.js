@@ -68,9 +68,16 @@ function renderMonthGrid() {
     const firstWeekday = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
     const todayStr = getLocalDateString(timeZone);
 
-    const headers = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-        .map(d => `<div class="cal-weekday">${d}</div>`).join('');
-    const blanks = Array.from({ length: firstWeekday }, () => `<div class="cal-day-cell empty"></div>`).join('');
+    // Respect the profile's week_starts_on setting (0=Sun, 1=Mon) — rotate
+    // the header labels and pad the leading blanks to start the 1st of the
+    // month in the correct column, matching the week view's behavior.
+    const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const headers = [
+        ...weekdayNames.slice(weekStartsOn),
+        ...weekdayNames.slice(0, weekStartsOn),
+    ].map(d => `<div class="cal-weekday">${d}</div>`).join('');
+    const leaderOffset = (firstWeekday - weekStartsOn + 7) % 7;
+    const blanks = Array.from({ length: leaderOffset }, () => `<div class="cal-day-cell empty"></div>`).join('');
 
     const days = Array.from({ length: daysInMonth }, (_, i) => {
         const day = i + 1;

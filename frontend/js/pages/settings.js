@@ -1,6 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
+import { resolveTheme } from '../themeUtils.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -45,7 +46,11 @@ async function handleSubmit(e) {
     try {
         await apiFetch('/settings', { method: 'PATCH', body: JSON.stringify(payload) });
 
-        document.documentElement.setAttribute('data-theme', payload.theme);
+        // Resolve the raw pref (light/dark/system) to an actual display value
+        // before writing data-theme — CSS only matches "light"/"dark", so
+        // writing "system" raw would fall back to the default until reload.
+        // The RAW pref is still cached in localStorage for pre-paint theme reads.
+        document.documentElement.setAttribute('data-theme', resolveTheme(payload.theme));
         localStorage.setItem('theme', payload.theme);
 
         const msg = document.getElementById('saveMsg');

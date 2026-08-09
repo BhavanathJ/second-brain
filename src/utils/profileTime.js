@@ -43,8 +43,8 @@ function getLocalMidnightUTC(timeZone, dateStr = null) {
     return midnight;
 }
 
-function getLocalDayBounds(timeZone, daysOffset = 0) {
-    const todayStr = getLocalDateString(timeZone);
+function getLocalDayBounds(timeZone, daysOffset = 0, now = new Date()) {
+    const todayStr = getLocalDateString(timeZone, now);
     const [y, m, d] = todayStr.split('-').map(Number);
     const targetDate = new Date(Date.UTC(y, m - 1, d + daysOffset));
     const targetStr = targetDate.toISOString().split('T')[0];
@@ -59,9 +59,9 @@ function getLocalDayBounds(timeZone, daysOffset = 0) {
     return { start: start.toISOString(), end: end.toISOString() };
 }
 
-function getLocalRangeBounds(timeZone, days) {
-    const start = getLocalDayBounds(timeZone, 0).start;
-    const end = getLocalDayBounds(timeZone, days - 1).end;
+function getLocalRangeBounds(timeZone, days, now = new Date()) {
+    const start = getLocalDayBounds(timeZone, 0, now).start;
+    const end = getLocalDayBounds(timeZone, days - 1, now).end;
     return { start, end };
 }
 

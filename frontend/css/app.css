@@ -339,6 +339,8 @@ a:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-bottom: 1.25rem;
 }
 
@@ -594,6 +596,8 @@ a:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-bottom: 1rem;
 }
 
@@ -609,6 +613,23 @@ a:hover {
     grid-template-columns: repeat(7, 1fr);
     gap: 0.35rem;
     margin-bottom: 1.5rem;
+}
+
+@media (max-width: 480px) {
+    .cal-grid {
+        gap: 0.2rem;
+    }
+    .cal-day-cell {
+        min-height: 48px;
+        padding: 0.15rem;
+        font-size: 0.65rem;
+    }
+    .cal-day-number {
+        font-size: 0.7rem;
+    }
+    .cal-weekday {
+        font-size: 0.58rem;
+    }
 }
 
 .cal-weekday {
@@ -869,7 +890,7 @@ a:hover {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    max-width: 320px;
+    max-width: min(320px, calc(100vw - 2rem));
 }
 
 .toast-item {

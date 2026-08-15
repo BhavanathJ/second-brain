@@ -259,6 +259,15 @@ a:hover {
     color: var(--sb-ink);
 }
 
+/* Bootstrap's .text-muted has its own hardcoded gray that ignores this
+   project's [data-theme] system entirely — Bootstrap's own dark mode
+   uses a different attribute (data-bs-theme) that was never wired up.
+   Needs !important since Bootstrap utilities ship with !important
+   themselves. */
+[data-theme="dark"] .text-muted {
+    color: var(--sb-muted) !important;
+}
+
 [data-theme="dark"] .form-text {
     color: var(--sb-muted);
 }

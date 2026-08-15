@@ -11,18 +11,23 @@ async function listHabits(req, res) {
 
         const habits = await habitService.listHabits(req.profileId);
 
-        const habitsWithProgress = await Promise.all(
-            habits.map(async (habit) => {
-                const weeklyCount = await habitService.getWeeklyCompletionCount(habit.id, timezone, week_starts_on);
-                const streak = await habitService.computeStreak(habit.id, habit.target_per_week, timezone, week_starts_on);
-                return {
-                    ...habit,
-                    this_week_count: weeklyCount,
-                    weekly_goal_met: weeklyCount >= habit.target_per_week,
-                    streak,
-                };
-            })
-        );
+        // ONE logs query for all habits, indexed by habit_id. The weekly
+        // counts and streaks are pure date-math on the fetched dates
+        // (previously this issued ~53 queries per habit, one per week).
+        const logs = await habitService.getCompletedLogs(req.profileId, timezone, week_starts_on);
+        const logIndex = habitService.buildHabitLogIndex(logs);
+
+        const habitsWithProgress = habits.map((habit) => {
+            const dateSet = logIndex.get(habit.id) ?? new Set();
+            const weeklyCount = habitService.weeklyCountForDates(dateSet, timezone, week_starts_on);
+            const streak = habitService.computeStreakForDates(dateSet, habit.target_per_week, timezone, week_starts_on);
+            return {
+                ...habit,
+                this_week_count: weeklyCount,
+                weekly_goal_met: weeklyCount >= habit.target_per_week,
+                streak,
+            };
+        });
 
         return res.status(200).json({ habits: habitsWithProgress });
     } catch (err) {
@@ -41,8 +46,10 @@ async function getHabit(req, res) {
         const settings = await settingsService.getSettings(req.profileId);
         const { timezone, week_starts_on } = settings;
 
-        const weeklyCount = await habitService.getWeeklyCompletionCount(habit.id, timezone, week_starts_on);
-        const streak = await habitService.computeStreak(habit.id, habit.target_per_week, timezone, week_starts_on);
+        const logs = await habitService.getCompletedLogs(req.profileId, timezone, week_starts_on, habit.id);
+        const dateSet = habitService.buildHabitLogIndex(logs).get(habit.id) ?? new Set();
+        const weeklyCount = habitService.weeklyCountForDates(dateSet, timezone, week_starts_on);
+        const streak = habitService.computeStreakForDates(dateSet, habit.target_per_week, timezone, week_starts_on);
 
         return res.status(200).json({
             habit: {

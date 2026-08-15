@@ -48,10 +48,21 @@ export function addMonths(dateStr, delta) {
 // so this stays correct across DST boundaries.
 export function getLocalMidnightUTC(timeZone, dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
-    const guessInstant = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-    const offsetMinutes = getOffsetMinutes(guessInstant, timeZone);
-    const localMidnightAsIfUTC = Date.UTC(y, m - 1, d, 0, 0, 0, 0);
-    return new Date(localMidnightAsIfUTC - offsetMinutes * 60000);
+
+    // Iterate to find the UTC instant whose local wall-clock is exactly
+    // 00:00:00 on the target date. Sampling the offset once at a noon
+    // guess is wrong on DST-transition days, where the offset at actual
+    // midnight differs from the offset at noon. Two passes converge: the
+    // second pass re-samples the offset at the corrected midnight instead
+    // of the noon guess.
+    let guessInstant = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    let midnight = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+    for (let i = 0; i < 2; i++) {
+        const offsetMinutes = getOffsetMinutes(guessInstant, timeZone);
+        midnight = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - offsetMinutes * 60000);
+        guessInstant = midnight;
+    }
+    return midnight;
 }
 
 // { startISO, endISO } spanning the entire local calendar month
@@ -60,10 +71,14 @@ export function getLocalMonthBounds(timeZone, dateStr) {
     const [y, m] = dateStr.split('-').map(Number);
     const firstOfMonth = `${y}-${String(m).padStart(2, '0')}-01`;
     const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const lastOfMonth = `${y}-${String(m).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
     const start = getLocalMidnightUTC(timeZone, firstOfMonth);
-    const end = new Date(getLocalMidnightUTC(timeZone, lastOfMonth).getTime() + 24 * 60 * 60 * 1000 - 1);
+    // End = the first midnight of the NEXT month - 1ms, not
+    // midnight(lastOfMonth) + literal 24h. If the last day of the month is
+    // a DST-transition day, that final "day" isn't exactly 24h long, so
+    // anchoring on the next month's own midnight keeps the boundary exact.
+    const firstOfNextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const end = new Date(getLocalMidnightUTC(timeZone, firstOfNextMonth).getTime() - 1);
 
     return { startISO: start.toISOString(), endISO: end.toISOString(), daysInMonth };
 }
@@ -71,7 +86,10 @@ export function getLocalMonthBounds(timeZone, dateStr) {
 // { startISO, endISO } spanning a single local calendar day.
 export function getLocalDayBounds(timeZone, dateStr) {
     const start = getLocalMidnightUTC(timeZone, dateStr);
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+    // End = the NEXT local midnight - 1ms, not start + literal 24h — a
+    // local day isn't exactly 24h across DST transitions.
+    const nextStr = addDays(dateStr, 1);
+    const end = new Date(getLocalMidnightUTC(timeZone, nextStr).getTime() - 1);
     return { startISO: start.toISOString(), endISO: end.toISOString() };
 }
 
@@ -93,6 +111,10 @@ export function getLocalWeekBounds(timeZone, weekStartsOn, dateStr) {
     const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, dateStr);
     const weekEndStr = addDays(weekStartStr, 6);
     const start = getLocalMidnightUTC(timeZone, weekStartStr);
-    const end = new Date(getLocalMidnightUTC(timeZone, weekEndStr).getTime() + 24 * 60 * 60 * 1000 - 1);
+    // End = the first midnight of the day AFTER the week ends - 1ms, not
+    // midnight(weekEndStr) + literal 24h — same DST reasoning as the other
+    // bounds functions.
+    const dayAfterWeekEnd = addDays(weekEndStr, 1);
+    const end = new Date(getLocalMidnightUTC(timeZone, dayAfterWeekEnd).getTime() - 1);
     return { startISO: start.toISOString(), endISO: end.toISOString(), weekStartStr, weekEndStr };
 }

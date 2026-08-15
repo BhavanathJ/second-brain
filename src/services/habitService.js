@@ -106,41 +106,75 @@ function daysBetween(aStr, bStr) {
     return Math.round((t2 - t1) / (24 * 60 * 60 * 1000));
 }
 
-async function getWeeklyCompletionCount(habitId, timeZone, weekStartsOn, date = new Date()) {
-    const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, date);
-    const weekEndStr = addDaysToDateString(weekStartStr, 6);
+// --- Batch completion math (replaces the per-habit query loop) ---
+//
+// Previously, listHabits/getHabit issued up to 52 sequential Supabase
+// queries per habit (one per week, inside computeStreak). All of that is
+// now one query for the whole 52-week window, then pure date-math against
+// a Set of logged dates.
 
-    const { data, error } = await supabase
-        .from('habit_logs')
-        .select('id', { count: 'exact' })
-        .eq('habit_id', habitId)
-        .eq('completed', true)
-        .gte('log_date', weekStartStr)
-        .lte('log_date', weekEndStr);
-
-    if (error) throw error;
-    return data.length;
+// The full date range a streak can ever need: the current week plus up to
+// 52 weeks back.
+function getStreakWindow(timeZone, weekStartsOn, now = new Date()) {
+    const currentWeekStart = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
+    return {
+        windowStart: addDaysToDateString(currentWeekStart, -51 * 7),
+        windowEnd: addDaysToDateString(currentWeekStart, 6),
+    };
 }
 
-async function computeStreak(habitId, targetPerWeek, timeZone, weekStartsOn) {
+// ONE query: every completed log date for a profile (optionally filtered
+// to a single habit) across the 52-week streak window. Rows: { habit_id, log_date }.
+async function getCompletedLogs(profileId, timeZone, weekStartsOn, habitId = null, now = new Date()) {
+    const { windowStart, windowEnd } = getStreakWindow(timeZone, weekStartsOn, now);
+    let query = supabase
+        .from('habit_logs')
+        .select('habit_id, log_date')
+        .eq('profile_id', profileId)
+        .eq('completed', true)
+        .gte('log_date', windowStart)
+        .lte('log_date', windowEnd);
+    if (habitId) query = query.eq('habit_id', habitId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+// Group the rows above by habit_id into Set<log_date> for O(1) membership.
+function buildHabitLogIndex(logs) {
+    const index = new Map();
+    for (const log of logs) {
+        if (!index.has(log.habit_id)) index.set(log.habit_id, new Set());
+        index.get(log.habit_id).add(log.log_date);
+    }
+    return index;
+}
+
+// How many of the 7 dates in a week (weekStartStr .. +6) are logged.
+function countInWeek(dateSet, weekStartStr) {
+    let count = 0;
+    for (let d = 0; d < 7; d++) {
+        if (dateSet.has(addDaysToDateString(weekStartStr, d))) count++;
+    }
+    return count;
+}
+
+function weeklyCountForDates(dateSet, timeZone, weekStartsOn, now = new Date()) {
+    const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
+    return countInWeek(dateSet, weekStartStr);
+}
+
+// Same streak algorithm as before, but reads from a pre-fetched Set of
+// log dates instead of issuing a Supabase query per week.
+function computeStreakForDates(dateSet, targetPerWeek, timeZone, weekStartsOn, now = new Date()) {
     let streak = 0;
-    let weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn);
-    const todayStr = getLocalDateString(timeZone);
+    let weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
+    const todayStr = getLocalDateString(timeZone, now);
 
     for (let i = 0; i < 52; i++) {
         const weekEndStr = addDaysToDateString(weekStartStr, 6);
-
-        const { data, error } = await supabase
-            .from('habit_logs')
-            .select('log_date')
-            .eq('habit_id', habitId)
-            .eq('completed', true)
-            .gte('log_date', weekStartStr)
-            .lte('log_date', weekEndStr);
-
-        if (error) throw error;
-
-        const count = data.length;
+        const count = countInWeek(dateSet, weekStartStr);
 
         if (i === 0) {
             const daysLeftInWeek = daysBetween(todayStr, weekEndStr) + 1;
@@ -168,6 +202,8 @@ module.exports = {
     softDeleteHabit,
     restoreHabit,
     hardDeleteHabit,
-    getWeeklyCompletionCount,
-    computeStreak,
+    getCompletedLogs,
+    buildHabitLogIndex,
+    weeklyCountForDates,
+    computeStreakForDates,
 };

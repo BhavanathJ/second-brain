@@ -25,26 +25,43 @@ function getLocalDateString(timeZone, date = new Date()) {
 function getLocalMidnightUTC(timeZone, dateStr = null) {
     const targetDateStr = dateStr ?? getLocalDateString(timeZone);
     const [y, m, d] = targetDateStr.split('-').map(Number);
-    const guessInstant = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-    const offsetMinutes = getOffsetMinutes(guessInstant, timeZone);
-    const localMidnightAsIfUTC = Date.UTC(y, m - 1, d, 0, 0, 0, 0);
-    return new Date(localMidnightAsIfUTC - offsetMinutes * 60000);
+
+    // Iterate to find the UTC instant whose local wall-clock is exactly
+    // 00:00:00 on the target date. Sampling the offset once at a noon
+    // guess is wrong on DST-transition days, where the offset at actual
+    // midnight differs from the offset at noon (e.g. a spring-forward day:
+    // 00:00 is still Standard time, 12:00 is already DST). Two passes
+    // converge: the second pass re-samples the offset at the corrected
+    // midnight instead of the noon guess.
+    let guessInstant = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    let midnight = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+    for (let i = 0; i < 2; i++) {
+        const offsetMinutes = getOffsetMinutes(guessInstant, timeZone);
+        midnight = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - offsetMinutes * 60000);
+        guessInstant = midnight;
+    }
+    return midnight;
 }
 
-function getLocalDayBounds(timeZone, daysOffset = 0) {
-    const todayStr = getLocalDateString(timeZone);
+function getLocalDayBounds(timeZone, daysOffset = 0, now = new Date()) {
+    const todayStr = getLocalDateString(timeZone, now);
     const [y, m, d] = todayStr.split('-').map(Number);
     const targetDate = new Date(Date.UTC(y, m - 1, d + daysOffset));
     const targetStr = targetDate.toISOString().split('T')[0];
 
     const start = getLocalMidnightUTC(timeZone, targetStr);
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+    // End = the NEXT local midnight - 1ms (not start + literal 24h). A local
+    // day isn't exactly 24h across DST transitions, so "start + 24h" can spill
+    // ±1h into the adjacent day. Deriving the end from the next midnight's own
+    // offset keeps the day boundary correct on 23/25-hour days.
+    const nextStr = addDaysToDateString(targetStr, 1);
+    const end = new Date(getLocalMidnightUTC(timeZone, nextStr).getTime() - 1);
     return { start: start.toISOString(), end: end.toISOString() };
 }
 
-function getLocalRangeBounds(timeZone, days) {
-    const start = getLocalDayBounds(timeZone, 0).start;
-    const end = getLocalDayBounds(timeZone, days - 1).end;
+function getLocalRangeBounds(timeZone, days, now = new Date()) {
+    const start = getLocalDayBounds(timeZone, 0, now).start;
+    const end = getLocalDayBounds(timeZone, days - 1, now).end;
     return { start, end };
 }
 

@@ -18,8 +18,17 @@ const { purgeExpiredEntries } = require('./controllers/binController');
 
 const app = express();
 
+// Required for express-rate-limit to see the REAL client IP once this
+// is deployed behind Render's reverse proxy — without this, every user
+// would be silently lumped into one shared rate-limit bucket (the
+// proxy's IP), rate-limiting each other instead of themselves.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
+
+const { globalApiLimiter } = require('./middleware/rateLimiters');
+app.use('/api', globalApiLimiter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

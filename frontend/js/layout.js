@@ -58,7 +58,7 @@ function renderNavHTML(activePage) {
               <option value="dark">🌙 Dark</option>
               <option value="system">🖥️ System</option>
             </select>
-            <button id="logoutBtn" class="btn btn-sm btn-outline-danger" type="button">Log out</button>
+            <button id="logoutBtn" class="btn btn-sm btn-outline-danger text-nowrap" type="button">Log out</button>
           </div>
         </div>
       </div>

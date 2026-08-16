@@ -18,12 +18,8 @@ function localInputToISO(value) {
     return new Date(value).toISOString();
 }
 
-const editModalEl = document.getElementById('noteModal');
-const editModal = new bootstrap.Modal(editModalEl);
-
-const convertModalEl = document.getElementById('convertNoteModal');
-const convertModal = new bootstrap.Modal(convertModalEl);
-
+let editModal = null;
+let convertModal = null;
 let allNotes = [];
 
 function renderNote(note) {
@@ -36,8 +32,8 @@ function renderNote(note) {
         : `<button class="btn btn-outline-primary btn-sm note-convert-btn" data-id="${note.id}" data-content="${escapeHtml(note.content)}">Convert to Task</button>`;
 
     return `
-    <div class="note-card">
-      <div class="note-content">${escapeHtml(note.content)}</div>
+    <div class="note-card" data-note-id="${note.id}">
+      <div class="note-content" data-full-content="${escapeHtml(note.content)}">${escapeHtml(note.content)}</div>
       ${tagsHTML}
       <div class="note-footer">
         ${convertedHTML}
@@ -67,11 +63,15 @@ async function loadNotes(tags = []) {
 
 function wireItemEvents() {
     document.querySelectorAll('.note-edit-btn').forEach(btn => {
-        btn.addEventListener('click', () => openEditModal(btn.dataset.id));
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEditModal(btn.dataset.id);
+        });
     });
 
     document.querySelectorAll('.note-delete-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
             const ok = await confirmAction('Move this note to Bin?');
             if (!ok) return;
             try {
@@ -85,11 +85,26 @@ function wireItemEvents() {
     });
 
     document.querySelectorAll('.note-convert-btn').forEach(btn => {
-        btn.addEventListener('click', () => openConvertModal(btn.dataset.id, btn.dataset.content));
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openConvertModal(btn.dataset.id, btn.dataset.content);
+        });
+    });
+
+    // Click on note content to expand/collapse
+    document.querySelectorAll('.note-content').forEach(contentEl => {
+        contentEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            contentEl.classList.toggle('expanded');
+        });
     });
 }
 
 function openEditModal(noteId) {
+    if (!editModal) {
+        const editModalEl = document.getElementById('noteModal');
+        editModal = new bootstrap.Modal(editModalEl);
+    }
     const note = allNotes.find(n => n.id === noteId);
     if (!note) return;
     document.getElementById('editNoteId').value = note.id;
@@ -99,6 +114,10 @@ function openEditModal(noteId) {
 }
 
 function openConvertModal(noteId, noteContent) {
+    if (!convertModal) {
+        const convertModalEl = document.getElementById('convertNoteModal');
+        convertModal = new bootstrap.Modal(convertModalEl);
+    }
     const note = allNotes.find(n => n.id === noteId);
     if (!note) return;
 

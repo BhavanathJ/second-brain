@@ -108,13 +108,20 @@ async function convertNoteToTask(req, res) {
             });
         }
 
-        // Use the note's content as the task title, trimmed to 200 chars
-        // so it doesn't overflow — notes can be long, task titles shouldn't be.
+        // Use the user-provided title from the form, or fall back to first 200 chars of content
+        const title = (req.body.title && req.body.title.trim()) ? req.body.title.trim() : note.content.slice(0, 200);
+        // Use user-provided description if provided, otherwise use full note content
+        const description = (req.body.description && req.body.description.trim()) ? req.body.description.trim() : note.content;
+        const urgent = Boolean(req.body.urgent);
+        const important = Boolean(req.body.important);
+        const due_at = req.body.due_at ? new Date(req.body.due_at) : null;
+
         const task = await taskService.createTask(req.profileId, {
-            title: note.content.slice(0, 200),
-            description: note.content.length > 200 ? note.content : null,
-            urgent: false,
-            important: false,
+            title,
+            description,
+            urgent,
+            important,
+            due_at,
         });
 
         const updatedNote = await noteService.markNoteConverted(

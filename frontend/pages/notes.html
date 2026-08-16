@@ -77,6 +77,55 @@
         </div>
     </div>
 
+    <!-- Convert Note to Task Modal -->
+    <div class="modal fade" id="convertNoteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <form id="convertNoteForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Convert Note to Task</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="convertNoteId" />
+                        <div class="mb-3">
+                            <label class="form-label" for="convertTaskTitle">Task Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="convertTaskTitle" required placeholder="Enter a title for this task" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="convertTaskDescription">Description</label>
+                            <textarea class="form-control" id="convertTaskDescription" rows="5"></textarea>
+                            <div class="form-text">The full note content is used as the description. You can edit it if needed.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="convertTaskDueAt">Due Date & Time (optional)</label>
+                            <input type="datetime-local" class="form-control" id="convertTaskDueAt" />
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="convertTaskUrgent" />
+                                    <label class="form-check-label" for="convertTaskUrgent">Urgent</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="convertTaskImportant" />
+                                    <label class="form-check-label" for="convertTaskImportant">Important</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Convert to Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="../js/pages/notes.js"></script>
 </body>

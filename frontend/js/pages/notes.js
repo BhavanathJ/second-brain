@@ -13,8 +13,17 @@ function parseTags(input) {
     return input.split(',').map(t => t.trim()).filter(Boolean);
 }
 
+function localInputToISO(value) {
+    if (!value) return null;
+    return new Date(value).toISOString();
+}
+
 const editModalEl = document.getElementById('noteModal');
 const editModal = new bootstrap.Modal(editModalEl);
+
+const convertModalEl = document.getElementById('convertNoteModal');
+const convertModal = new bootstrap.Modal(convertModalEl);
+
 let allNotes = [];
 
 function renderNote(note) {
@@ -24,7 +33,7 @@ function renderNote(note) {
 
     const convertedHTML = note.converted_task_id
         ? `<span class="note-converted-badge">✓ Converted to task</span>`
-        : `<button class="btn btn-outline-primary btn-sm note-convert-btn" data-id="${note.id}">Convert to Task</button>`;
+        : `<button class="btn btn-outline-primary btn-sm note-convert-btn" data-id="${note.id}" data-content="${escapeHtml(note.content)}">Convert to Task</button>`;
 
     return `
     <div class="note-card">
@@ -76,18 +85,7 @@ function wireItemEvents() {
     });
 
     document.querySelectorAll('.note-convert-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            btn.disabled = true;
-            try {
-                await apiFetch(`/notes/${btn.dataset.id}/convert`, { method: 'POST' });
-                showToast('Converted to task', 'success');
-                await loadNotes(currentFilterTags());
-            } catch (err) {
-                // 409 = already converted (e.g. by another tab) — refresh to show the real state
-                showToast(err.message);
-                await loadNotes(currentFilterTags());
-            }
-        });
+        btn.addEventListener('click', () => openConvertModal(btn.dataset.id, btn.dataset.content));
     });
 }
 
@@ -98,6 +96,53 @@ function openEditModal(noteId) {
     document.getElementById('editNoteContent').value = note.content;
     document.getElementById('editNoteTags').value = note.tags.join(', ');
     editModal.show();
+}
+
+function openConvertModal(noteId, noteContent) {
+    const note = allNotes.find(n => n.id === noteId);
+    if (!note) return;
+
+    // Use full note content as description, leave title empty for user to enter
+    document.getElementById('convertNoteId').value = noteId;
+    document.getElementById('convertTaskTitle').value = '';
+    document.getElementById('convertTaskDescription').value = note.content;
+    document.getElementById('convertTaskDueAt').value = '';
+    document.getElementById('convertTaskUrgent').checked = false;
+    document.getElementById('convertTaskImportant').checked = false;
+
+    convertModal.show();
+}
+
+async function handleConvertSubmit(e) {
+    e.preventDefault();
+
+    const noteId = document.getElementById('convertNoteId').value;
+    const title = document.getElementById('convertTaskTitle').value.trim();
+    if (!title) {
+        showToast('Task title is required');
+        return;
+    }
+    const payload = {
+        title,
+        description: document.getElementById('convertTaskDescription').value.trim(),
+        urgent: document.getElementById('convertTaskUrgent').checked,
+        important: document.getElementById('convertTaskImportant').checked,
+        due_at: localInputToISO(document.getElementById('convertTaskDueAt').value),
+    };
+
+    try {
+        await apiFetch(`/notes/${noteId}/convert`, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        convertModal.hide();
+        showToast('Converted to task', 'success');
+        await loadNotes(currentFilterTags());
+    } catch (err) {
+        // 409 = already converted (e.g. by another tab) — refresh to show the real state
+        showToast(err.message);
+        await loadNotes(currentFilterTags());
+    }
 }
 
 async function handleEditSubmit(e) {
@@ -142,6 +187,7 @@ async function main() {
 
     document.getElementById('captureForm').addEventListener('submit', handleCaptureSubmit);
     document.getElementById('editNoteForm').addEventListener('submit', handleEditSubmit);
+    document.getElementById('convertNoteForm').addEventListener('submit', handleConvertSubmit);
     document.getElementById('applyFilterBtn').addEventListener('click', () => loadNotes(currentFilterTags()));
     document.getElementById('clearFilterBtn').addEventListener('click', () => {
         document.getElementById('tagFilter').value = '';

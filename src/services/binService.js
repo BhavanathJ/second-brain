@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const noteService = require('./noteService');
 
 const ENTITY_LABEL_CONFIG = {
     task: { table: 'tasks', column: 'title' },

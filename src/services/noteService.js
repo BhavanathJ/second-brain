@@ -118,6 +118,20 @@ async function hardDeleteNote(profileId, noteId) {
     if (error) throw error;
 }
 
+// Find note by converted_task_id and clear it (when converted task is deleted)
+async function clearConvertedTaskId(profileId, taskId) {
+    const { data, error } = await supabase
+        .from('notes')
+        .update({ converted_task_id: null, updated_at: new Date().toISOString() })
+        .eq('profile_id', profileId)
+        .eq('converted_task_id', taskId)
+        .select()
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     listNotes,
     getNoteById,
@@ -127,4 +141,5 @@ module.exports = {
     softDeleteNote,
     restoreNote,
     hardDeleteNote,
+    clearConvertedTaskId,
 };

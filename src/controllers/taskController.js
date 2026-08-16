@@ -1,5 +1,6 @@
 const taskService = require('../services/taskService');
 const binService = require('../services/binService');
+const noteService = require('../services/noteService');
 
 function parseBoolParam(value) {
     if (value === undefined) return undefined;
@@ -92,6 +93,10 @@ async function deleteTask(req, res) {
         }
 
         await binService.logDeletion(req.profileId, 'task', task.id);
+
+        // If this task was converted from a note, clear the converted_task_id on the note
+        // so the note can be converted again
+        await noteService.clearConvertedTaskId(req.profileId, task.id);
 
         return res.status(204).send();
     } catch (err) {

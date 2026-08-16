@@ -85,6 +85,12 @@ async function permanentDelete(req, res) {
         await handler.hardDelete(req.profileId, entry.entity_id);
         await binService.removeBinEntry(req.profileId, entry.id);
 
+        // If a task that was converted from a note is permanently deleted,
+        // clear the converted_task_id on the note so it can be converted again
+        if (entry.entity_type === 'task') {
+            await noteService.clearConvertedTaskId(req.profileId, entry.entity_id);
+        }
+
         return res.status(204).send();
     } catch (err) {
         console.error('Permanent delete error:', err);
@@ -104,6 +110,13 @@ async function purgeExpiredEntries() {
         try {
             await handler.hardDelete(entry.profile_id, entry.entity_id);
             await binService.removeBinEntry(entry.profile_id, entry.id);
+
+            // If a task that was converted from a note is purged,
+            // clear the converted_task_id on the note so it can be converted again
+            if (entry.entity_type === 'task') {
+                await noteService.clearConvertedTaskId(entry.profile_id, entry.entity_id);
+            }
+
             console.log(`[cron] Purged ${entry.entity_type} ${entry.entity_id}`);
         } catch (err) {
             console.error(`[cron] Failed to purge ${entry.entity_type} ${entry.entity_id}:`, err);

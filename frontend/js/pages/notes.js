@@ -33,7 +33,9 @@ function renderNote(note) {
 
     return `
     <div class="note-card" data-note-id="${note.id}">
-      <div class="note-content" data-full-content="${escapeHtml(note.content)}">${escapeHtml(note.content)}</div>
+      <div class="note-content" id="content-${note.id}">${escapeHtml(note.content)}</div>
+      <button type="button" class="btn btn-link btn-sm p-0 note-toggle-btn d-none"
+              data-target="content-${note.id}" aria-expanded="false">Show more</button>
       ${tagsHTML}
       <div class="note-footer">
         ${convertedHTML}
@@ -63,15 +65,11 @@ async function loadNotes(tags = []) {
 
 function wireItemEvents() {
     document.querySelectorAll('.note-edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openEditModal(btn.dataset.id);
-        });
+        btn.addEventListener('click', () => openEditModal(btn.dataset.id));
     });
 
     document.querySelectorAll('.note-delete-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
+        btn.addEventListener('click', async () => {
             const ok = await confirmAction('Move this note to Bin?');
             if (!ok) return;
             try {
@@ -85,17 +83,36 @@ function wireItemEvents() {
     });
 
     document.querySelectorAll('.note-convert-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openConvertModal(btn.dataset.id, btn.dataset.content);
+        btn.addEventListener('click', () => openConvertModal(btn.dataset.id, btn.dataset.content));
+    });
+
+    // Keyboard-accessible expand/collapse — a real <button>, not a click
+    // handler on the text itself, so Tab/Enter/Space work and screen
+    // readers get a proper aria-expanded announcement.
+    document.querySelectorAll('.note-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const contentEl = document.getElementById(btn.dataset.target);
+            const isExpanded = contentEl.classList.toggle('expanded');
+            btn.setAttribute('aria-expanded', String(isExpanded));
+            btn.textContent = isExpanded ? 'Show less' : 'Show more';
         });
     });
 
-    // Click on note content to expand/collapse
-    document.querySelectorAll('.note-content').forEach(contentEl => {
-        contentEl.addEventListener('click', (e) => {
-            e.stopPropagation();
-            contentEl.classList.toggle('expanded');
+    updateNoteToggleVisibility();
+}
+
+// Only show "Show more" on notes that are ACTUALLY clamped — a short
+// note doesn't need a toggle button that does nothing. Must run after
+// the DOM has actually laid out the clamped text (requestAnimationFrame
+// waits for the next paint), or scrollHeight/clientHeight would still
+// reflect the pre-render state.
+function updateNoteToggleVisibility() {
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.note-content').forEach(contentEl => {
+            const toggleBtn = document.querySelector(`.note-toggle-btn[data-target="${contentEl.id}"]`);
+            if (!toggleBtn) return;
+            const isTruncated = contentEl.scrollHeight > contentEl.clientHeight + 1; // +1 guards against sub-pixel rounding
+            toggleBtn.classList.toggle('d-none', !isTruncated);
         });
     });
 }

@@ -24,7 +24,20 @@ const app = express();
 // proxy's IP), rate-limiting each other instead of themselves.
 app.set('trust proxy', 1);
 
-app.use(cors({ origin: config.corsOrigin }));
+const allowedOrigins = Array.isArray(config.corsOrigin)
+    ? config.corsOrigin
+    : [config.corsOrigin];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
 app.use(express.json());
 
 const { globalApiLimiter } = require('./middleware/rateLimiters');

@@ -5,3 +5,4 @@ node_modules/
 .env.dev
 .env.prod
 .claude
+.playwright-cli

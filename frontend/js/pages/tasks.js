@@ -22,8 +22,8 @@ function formatDateTime(isoString, timeZone) {
 
 let timeZone = 'UTC';
 let allTasks = [];
-const modalEl = document.getElementById('taskModal');
-const modal = new bootstrap.Modal(modalEl);
+let modal = null;
+let viewModal = null;
 
 function bucketTasks(tasks) {
     return {
@@ -43,6 +43,7 @@ function renderTaskItem(task) {
         ${task.due_at ? `<div class="task-item-time">${formatDateTime(task.due_at, timeZone)}</div>` : ''}
       </div>
       <div class="task-item-actions">
+        <button class="btn btn-outline-secondary task-view-btn" data-id="${task.id}">View</button>
         <button class="btn btn-outline-secondary task-edit-btn" data-id="${task.id}">Edit</button>
         <button class="btn btn-outline-danger task-delete-btn" data-id="${task.id}">Delete</button>
       </div>
@@ -89,6 +90,10 @@ function wireItemEvents() {
         });
     });
 
+    document.querySelectorAll('.task-view-btn').forEach(btn => {
+        btn.addEventListener('click', () => openViewModal(btn.dataset.id));
+    });
+
     document.querySelectorAll('.task-edit-btn').forEach(btn => {
         btn.addEventListener('click', () => openModal(btn.dataset.id));
     });
@@ -121,6 +126,10 @@ function isoToLocalInput(isoString) {
 }
 
 function openModal(taskId) {
+    if (!modal) {
+        const modalEl = document.getElementById('taskModal');
+        modal = new bootstrap.Modal(modalEl);
+    }
     const form = document.getElementById('taskForm');
     form.reset();
     document.getElementById('taskId').value = '';
@@ -140,6 +149,31 @@ function openModal(taskId) {
     }
 
     modal.show();
+}
+
+function openViewModal(taskId) {
+    if (!viewModal) {
+        const viewModalEl = document.getElementById('viewTaskModal');
+        viewModal = new bootstrap.Modal(viewModalEl);
+    }
+    const task = allTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    document.getElementById('viewTaskTitle').textContent = task.title;
+    document.getElementById('viewTaskDescription').textContent = task.description ?? '—';
+    document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTime(task.due_at, timeZone) : '—';
+    document.getElementById('viewTaskStatus').textContent = task.status === 'done' ? 'Done' : 'Pending';
+    document.getElementById('viewTaskUrgent').checked = task.urgent;
+    document.getElementById('viewTaskImportant').checked = task.important;
+
+    // Set up Edit button to close view modal and open edit modal
+    const editBtn = document.getElementById('viewTaskEditBtn');
+    editBtn.onclick = () => {
+        viewModal.hide();
+        openModal(task.id);
+    };
+
+    viewModal.show();
 }
 
 async function handleSubmit(e) {

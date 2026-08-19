@@ -51,7 +51,7 @@ function renderNavHTML(activePage) {
         </button>
         <div class="collapse navbar-collapse" id="appNavCollapse">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">${links}</ul>
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-2 nav-controls">
             <select id="profileSwitcher" class="form-select form-select-sm app-profile-select" aria-label="Active profile"></select>
             <select id="themeSelect" class="form-select form-select-sm app-theme-select" aria-label="Theme" title="Theme">
               <option value="light">☀️ Light</option>

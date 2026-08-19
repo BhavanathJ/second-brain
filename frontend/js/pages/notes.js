@@ -18,12 +18,8 @@ function localInputToISO(value) {
     return new Date(value).toISOString();
 }
 
-const editModalEl = document.getElementById('noteModal');
-const editModal = new bootstrap.Modal(editModalEl);
-
-const convertModalEl = document.getElementById('convertNoteModal');
-const convertModal = new bootstrap.Modal(convertModalEl);
-
+let editModal = null;
+let convertModal = null;
 let allNotes = [];
 
 function renderNote(note) {
@@ -36,8 +32,10 @@ function renderNote(note) {
         : `<button class="btn btn-outline-primary btn-sm note-convert-btn" data-id="${note.id}" data-content="${escapeHtml(note.content)}">Convert to Task</button>`;
 
     return `
-    <div class="note-card">
-      <div class="note-content">${escapeHtml(note.content)}</div>
+    <div class="note-card" data-note-id="${note.id}">
+      <div class="note-content" id="content-${note.id}">${escapeHtml(note.content)}</div>
+      <button type="button" class="btn btn-link btn-sm p-0 note-toggle-btn d-none"
+              data-target="content-${note.id}" aria-expanded="false">Show more</button>
       ${tagsHTML}
       <div class="note-footer">
         ${convertedHTML}
@@ -87,9 +85,43 @@ function wireItemEvents() {
     document.querySelectorAll('.note-convert-btn').forEach(btn => {
         btn.addEventListener('click', () => openConvertModal(btn.dataset.id, btn.dataset.content));
     });
+
+    // Keyboard-accessible expand/collapse — a real <button>, not a click
+    // handler on the text itself, so Tab/Enter/Space work and screen
+    // readers get a proper aria-expanded announcement.
+    document.querySelectorAll('.note-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const contentEl = document.getElementById(btn.dataset.target);
+            const isExpanded = contentEl.classList.toggle('expanded');
+            btn.setAttribute('aria-expanded', String(isExpanded));
+            btn.textContent = isExpanded ? 'Show less' : 'Show more';
+        });
+    });
+
+    updateNoteToggleVisibility();
+}
+
+// Only show "Show more" on notes that are ACTUALLY clamped — a short
+// note doesn't need a toggle button that does nothing. Must run after
+// the DOM has actually laid out the clamped text (requestAnimationFrame
+// waits for the next paint), or scrollHeight/clientHeight would still
+// reflect the pre-render state.
+function updateNoteToggleVisibility() {
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.note-content').forEach(contentEl => {
+            const toggleBtn = document.querySelector(`.note-toggle-btn[data-target="${contentEl.id}"]`);
+            if (!toggleBtn) return;
+            const isTruncated = contentEl.scrollHeight > contentEl.clientHeight + 1; // +1 guards against sub-pixel rounding
+            toggleBtn.classList.toggle('d-none', !isTruncated);
+        });
+    });
 }
 
 function openEditModal(noteId) {
+    if (!editModal) {
+        const editModalEl = document.getElementById('noteModal');
+        editModal = new bootstrap.Modal(editModalEl);
+    }
     const note = allNotes.find(n => n.id === noteId);
     if (!note) return;
     document.getElementById('editNoteId').value = note.id;
@@ -99,6 +131,10 @@ function openEditModal(noteId) {
 }
 
 function openConvertModal(noteId, noteContent) {
+    if (!convertModal) {
+        const convertModalEl = document.getElementById('convertNoteModal');
+        convertModal = new bootstrap.Modal(convertModalEl);
+    }
     const note = allNotes.find(n => n.id === noteId);
     if (!note) return;
 

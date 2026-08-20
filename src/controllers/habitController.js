@@ -151,6 +151,32 @@ async function logCompletion(req, res) {
             date = getLocalDateString(settings.timezone);
         }
 
+        // Validate date format (YYYY-MM-DD) and reasonableness
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(date)) {
+            return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+        }
+
+        const parsedDate = new Date(date + 'T00:00:00');
+        if (isNaN(parsedDate.getTime())) {
+            return res.status(400).json({ error: 'Invalid date value.' });
+        }
+
+        // Check date is not too far in the future (e.g., more than 1 year)
+        const now = new Date();
+        const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+        if (parsedDate > oneYearFromNow) {
+            return res.status(400).json({ error: 'Date cannot be more than one year in the future.' });
+        }
+
+        // Check date is not too far in the past (e.g., before habit creation)
+        // This is a reasonable boundary - logs before habit creation don't make sense
+        // Compare just the date portion, not the full timestamp
+        const habitCreatedDate = habit.created_at.split('T')[0]; // Get YYYY-MM-DD portion
+        if (date < habitCreatedDate) {
+            return res.status(400).json({ error: 'Date cannot be before habit creation date.' });
+        }
+
         const log = await habitLogService.createLog(habit.id, req.profileId, date);
         return res.status(201).json({ log });
     } catch (err) {
@@ -164,6 +190,17 @@ async function logCompletion(req, res) {
 
 async function deleteLog(req, res) {
     const { date } = req.params;
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+
+    const parsedDate = new Date(date + 'T00:00:00');
+    if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid date value.' });
+    }
 
     try {
         const habit = await habitService.getHabitById(req.profileId, req.params.id);
@@ -188,6 +225,22 @@ async function getLogs(req, res) {
 
     if (!start || !end) {
         return res.status(400).json({ error: 'start and end query params are required (YYYY-MM-DD).' });
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(start) || !dateRegex.test(end)) {
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+
+    const parsedStart = new Date(start + 'T00:00:00');
+    const parsedEnd = new Date(end + 'T00:00:00');
+    if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+        return res.status(400).json({ error: 'Invalid date value.' });
+    }
+
+    if (parsedStart > parsedEnd) {
+        return res.status(400).json({ error: 'start date must be before or equal to end date.' });
     }
 
     try {

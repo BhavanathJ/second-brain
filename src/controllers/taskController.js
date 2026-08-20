@@ -40,10 +40,18 @@ async function createTask(req, res) {
     // column) — previously this was `dueAt` (camelCase) here while
     // updateTask used `due_at` (snake_case), same resource, two
     // different conventions depending on which endpoint you hit.
-    const { title, description, urgent, important, due_at } = req.body;
+    const { title, description, urgent, important, due_at, status } = req.body;
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title is required.' });
+    }
+
+    // Validate status if provided
+    if (status !== undefined) {
+        const validStatuses = ['pending', 'done'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` });
+        }
     }
 
     try {
@@ -53,6 +61,7 @@ async function createTask(req, res) {
             urgent,
             important,
             due_at,
+            status,
         });
         return res.status(201).json({ task });
     } catch (err) {
@@ -71,6 +80,14 @@ async function updateTask(req, res) {
 
     if (Object.keys(fields).length === 0) {
         return res.status(400).json({ error: 'No valid fields to update.' });
+    }
+
+    // Validate status if provided
+    if (fields.status !== undefined) {
+        const validStatuses = ['pending', 'done'];
+        if (!validStatuses.includes(fields.status)) {
+            return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` });
+        }
     }
 
     try {

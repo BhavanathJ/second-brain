@@ -31,14 +31,18 @@ async function updateSettings(req, res) {
 
     // Validate values before hitting the DB — bad values here would
     // silently corrupt settings that affect timezone and habit calculations.
-    if (fields.theme && !VALID_THEMES.includes(fields.theme)) {
-        return res.status(400).json({ error: `Invalid theme. Must be one of: ${VALID_THEMES.join(', ')}.` });
+    if (fields.theme !== undefined) {
+        if (!fields.theme || typeof fields.theme !== 'string' || !VALID_THEMES.includes(fields.theme)) {
+            return res.status(400).json({ error: `Invalid theme. Must be one of: ${VALID_THEMES.join(', ')}.` });
+        }
     }
     if (fields.week_starts_on !== undefined && !VALID_WEEK_STARTS.includes(fields.week_starts_on)) {
         return res.status(400).json({ error: 'Invalid week_starts_on. Must be 0 (Sunday) or 1 (Monday).' });
     }
-    if (fields.timezone && !VALID_TIMEZONES.has(fields.timezone)) {
-        return res.status(400).json({ error: 'Invalid timezone. Must be a valid IANA timezone name (e.g. "Asia/Kolkata").' });
+    if (fields.timezone !== undefined) {
+        if (!fields.timezone || typeof fields.timezone !== 'string' || !VALID_TIMEZONES.has(fields.timezone)) {
+            return res.status(400).json({ error: 'Invalid timezone. Must be a valid IANA timezone name (e.g. "Asia/Kolkata").' });
+        }
     }
 
     try {

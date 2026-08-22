@@ -308,27 +308,30 @@ a:hover {
     }
 }
 
-/* Fix Bootstrap modal centering in mobile — Bootstrap's .modal.show uses
-   display: block which doesn't center the modal-dialog (which has
-   min-height: calc(100% - 16px) and align-items: center). Force flex
-   + center on the overlay so modal-dialog-centered actually centers. */
+/* Fix Bootstrap modal centering in mobile — let Bootstrap's native
+   .modal-dialog-centered handle vertical centering. It uses flexbox with
+   min-height: calc(100% - 1rem) on the dialog, which centers the
+   modal-content within the full-height .modal overlay.
+   Our previous override (making .modal.show a flex container) broke this
+   because the overlay didn't have a defined height in some mobile contexts. */
 .modal.show {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    /* Revert to Bootstrap default — display: block lets the fixed-position
+       overlay cover the full viewport, giving modal-dialog-centered a
+       reference height to center against. */
+    display: block !important;
 }
 
-/* Ensure modal-dialog-centered centers content vertically by making the
-   dialog itself a flex column container. Bootstrap's default gives it
-   flex-direction: row, which prevents vertical centering of modal-content.
-   Remove min-height so the dialog sizes to content and lets the overlay
-   center it properly. */
+/* Ensure modal-dialog-centered works correctly on mobile by preserving
+   Bootstrap's intended min-height (calc(100% - 1rem)) and flex column
+   layout for the modal-content. */
 .modal-dialog.modal-dialog-centered {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
+    /* Restore Bootstrap's min-height so the dialog has a reference height
+       to vertically center the modal-content within the viewport. */
+    min-height: calc(100% - 1rem) !important;
     justify-content: center !important;
-    min-height: auto !important;
 }
 
 [data-theme="dark"] .modal-content {
@@ -579,12 +582,15 @@ a:hover {
     -webkit-box-orient: vertical;
     line-clamp: 2;
     transition: all 0.2s ease;
+    word-break: break-word;
+    max-height: 4.6em; /* ~2 lines at 0.9rem with 1.2 line-height */
 }
 
 .note-content.expanded {
     -webkit-line-clamp: unset;
     line-clamp: unset;
     overflow: visible;
+    max-height: none;
 }
 
 .note-tags {
@@ -928,15 +934,20 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .bin-item-body {
     flex: 1;
+    min-width: 0;
 }
 
 .bin-item-label {
     font-size: 0.88rem;
     margin-bottom: 0.2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .bin-item-meta {
@@ -954,16 +965,42 @@ a:hover {
     border: 1px solid var(--sb-border);
     color: var(--sb-muted);
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .bin-item-actions {
     display: flex;
     gap: 0.3rem;
+    flex-shrink: 0;
 }
 
 .bin-item-actions button {
     font-size: 0.72rem;
     padding: 0.15rem 0.5rem;
+}
+
+/* Mobile: stack bin item actions vertically when space is tight */
+@media (max-width: 480px) {
+    .bin-item {
+        gap: 0.5rem;
+    }
+
+    .bin-item-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.4rem;
+        margin-top: 0.25rem;
+    }
+
+    .bin-item-actions button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .bin-badge {
+        font-size: 0.58rem;
+        padding: 0.05rem 0.35rem;
+    }
 }
 
 .settings-page {

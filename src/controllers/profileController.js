@@ -2,8 +2,6 @@ const profileService = require('../services/profileService');
 const settingsService = require('../services/settingsService');
 const { issueTokenPair } = require('./authController');
 
-const MAX_PROFILES_PER_USER = 5;
-
 async function listProfiles(req, res) {
     try {
         const profiles = await profileService.listProfilesForUser(req.userId);
@@ -24,10 +22,6 @@ async function createProfile(req, res) {
     const trimmedName = name.trim();
 
     try {
-        const existingCount = await profileService.countProfilesForUser(req.userId);
-        if (existingCount >= MAX_PROFILES_PER_USER) {
-            return res.status(400).json({ error: `Maximum of ${MAX_PROFILES_PER_USER} profiles per account.` });
-        }
 
         // Check for duplicate profile name for this user
         const profiles = await profileService.listProfilesForUser(req.userId);

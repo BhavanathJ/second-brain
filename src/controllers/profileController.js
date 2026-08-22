@@ -21,13 +21,22 @@ async function createProfile(req, res) {
         return res.status(400).json({ error: 'Profile name is required.' });
     }
 
+    const trimmedName = name.trim();
+
     try {
         const existingCount = await profileService.countProfilesForUser(req.userId);
         if (existingCount >= MAX_PROFILES_PER_USER) {
             return res.status(400).json({ error: `Maximum of ${MAX_PROFILES_PER_USER} profiles per account.` });
         }
 
-        const profile = await profileService.createProfile(req.userId, name.trim());
+        // Check for duplicate profile name for this user
+        const profiles = await profileService.listProfilesForUser(req.userId);
+        const duplicate = profiles.find(p => p.name.toLowerCase() === trimmedName.toLowerCase());
+        if (duplicate) {
+            return res.status(400).json({ error: 'A profile with this name already exists.' });
+        }
+
+        const profile = await profileService.createProfile(req.userId, trimmedName);
         await settingsService.createDefaultSettings(profile.id);
 
         return res.status(201).json({ profile });
@@ -60,8 +69,19 @@ async function renameProfile(req, res) {
         return res.status(400).json({ error: 'Profile name is required.' });
     }
 
+    const trimmedName = name.trim();
+
     try {
-        const profile = await profileService.renameProfile(req.userId, req.params.id, name.trim());
+        // Check for duplicate profile name for this user (excluding the profile being renamed)
+        const profiles = await profileService.listProfilesForUser(req.userId);
+        const duplicate = profiles.find(p =>
+            p.id !== req.params.id && p.name.toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (duplicate) {
+            return res.status(400).json({ error: 'A profile with this name already exists.' });
+        }
+
+        const profile = await profileService.renameProfile(req.userId, req.params.id, trimmedName);
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found.' });
         }

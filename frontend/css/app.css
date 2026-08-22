@@ -308,6 +308,29 @@ a:hover {
     }
 }
 
+/* Fix Bootstrap modal centering in mobile — Bootstrap's .modal.show uses
+   display: block which doesn't center the modal-dialog (which has
+   min-height: calc(100% - 16px) and align-items: center). Force flex
+   + center on the overlay so modal-dialog-centered actually centers. */
+.modal.show {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Ensure modal-dialog-centered centers content vertically by making the
+   dialog itself a flex column container. Bootstrap's default gives it
+   flex-direction: row, which prevents vertical centering of modal-content.
+   Remove min-height so the dialog sizes to content and lets the overlay
+   center it properly. */
+.modal-dialog.modal-dialog-centered {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: auto !important;
+}
+
 [data-theme="dark"] .modal-content {
     background-color: var(--sb-surface);
     color: var(--sb-ink);

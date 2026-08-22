@@ -50,7 +50,7 @@ function enumerateDates(startStr, endStr) {
 const RANGE_START = '2025-01-01';
 const RANGE_END = '2026-12-31';
 
-// (date, spanHours) — exact day-length on known transition days.
+// (date, spanHours) - exact day-length on known transition days.
 const KNOWN_TRANSITIONS = {
   'America/New_York': {
     '2025-03-09': 23, '2025-11-02': 25,
@@ -72,7 +72,7 @@ const KNOWN_TRANSITIONS = {
 const TIMEZONES = Object.keys(KNOWN_TRANSITIONS);
 
 for (const tz of TIMEZONES) {
-  section(`Day bounds over 2 years — ${tz}`);
+  section(`Day bounds over 2 years - ${tz}`);
   let badMidnights = 0;
   let badSpans = 0;
   let badBounds = 0;
@@ -97,7 +97,7 @@ for (const tz of TIMEZONES) {
     }
 
     // getLocalDayBounds with a now-on-that-day must return exactly
-    // [localMidnight, nextLocalMidnight - 1ms] — the DST fix.
+    // [localMidnight, nextLocalMidnight - 1ms] - the DST fix.
     const bounds = getLocalDayBounds(tz, 0, localNoon(tz, dateStr));
     const expectEnd = new Date(nextMidnight.getTime() - 1).toISOString();
     if (bounds.start !== midnight.toISOString() || bounds.end !== expectEnd) {

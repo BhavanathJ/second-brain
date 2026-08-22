@@ -15,7 +15,7 @@ async function getLogForDate(habitId, profileId, date) {
 }
 
 // Mark a habit as completed for a specific date.
-// UNIQUE(habit_id, log_date) constraint in DB prevents double-logging —
+// UNIQUE(habit_id, log_date) constraint in DB prevents double-logging -
 // Supabase will throw a 23505 error if this date already has a log,
 // which the controller catches and returns as a clean 409.
 async function createLog(habitId, profileId, date) {

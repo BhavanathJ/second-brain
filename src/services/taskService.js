@@ -91,7 +91,7 @@ async function restoreTask(profileId, taskId) {
     return data;
 }
 
-// Permanent delete: removes the row entirely. Called from Bin only —
+// Permanent delete: removes the row entirely. Called from Bin only -
 // normal task deletion always uses softDeleteTask.
 async function hardDeleteTask(profileId, taskId) {
     const { error } = await supabase

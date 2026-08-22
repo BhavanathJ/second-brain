@@ -6,15 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Second Brain</title>
     <script>
-        (function () {
-            var pref = localStorage.getItem('theme') || 'system';
-            var resolved = pref === 'system'
-                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-                : pref;
-            document.documentElement.setAttribute('data-theme', resolved);
-        })();
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
 </head>
@@ -22,14 +19,8 @@
 <body>
     <div class="auth-shell">
         <div class="auth-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="text-center mb-3">
                 <div class="auth-wordmark mb-0">Second<span>Brain</span></div>
-                <select id="preLoginThemeSelect" class="form-select form-select-sm" style="width: auto;"
-                    aria-label="Theme" title="Theme">
-                    <option value="light">☀️</option>
-                    <option value="dark">🌙</option>
-                    <option value="system">🖥️</option>
-                </select>
             </div>
 
             <div class="auth-tabs">

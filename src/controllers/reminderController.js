@@ -32,7 +32,7 @@ async function getReminder(req, res) {
 
 async function createReminder(req, res) {
     // remind_at/entity_type/entity_id now match updateReminder's field
-    // names — previously camelCase here (remindAt/entityType/entityId)
+    // names - previously camelCase here (remindAt/entityType/entityId)
     // while update used snake_case, and this endpoint would actively
     // reject the "correct" snake_case name instead of just ignoring it.
     const { title, remind_at, entity_type, entity_id } = req.body;
@@ -93,7 +93,7 @@ async function updateReminder(req, res) {
         fields.entity_type = null;
     }
 
-    // Same entity_type/entity_id rules as createReminder — keeps create and
+    // Same entity_type/entity_id rules as createReminder - keeps create and
     // update consistent, so a PATCH can't orphan a reminder by setting an
     // unbalanced or invalid entity link. An explicit { entity_type: null,
     // entity_id: null } is allowed and unlinks the reminder.

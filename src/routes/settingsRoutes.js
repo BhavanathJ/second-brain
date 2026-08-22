@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-// Only two operations on settings — read and update.
+// Only two operations on settings - read and update.
 // No POST (created at signup), no DELETE (lives as long as the profile).
 router.get('/', settingsController.getSettings);
 router.patch('/', settingsController.updateSettings);

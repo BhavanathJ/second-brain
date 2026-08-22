@@ -68,7 +68,7 @@ function renderMonthGrid() {
     const firstWeekday = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
     const todayStr = getLocalDateString(timeZone);
 
-    // Respect the profile's week_starts_on setting (0=Sun, 1=Mon) — rotate
+    // Respect the profile's week_starts_on setting (0=Sun, 1=Mon) - rotate
     // the header labels and pad the leading blanks to start the 1st of the
     // month in the correct column, matching the week view's behavior.
     const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

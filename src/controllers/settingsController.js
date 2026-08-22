@@ -29,7 +29,7 @@ async function updateSettings(req, res) {
         return res.status(400).json({ error: 'No valid fields to update.' });
     }
 
-    // Validate values before hitting the DB — bad values here would
+    // Validate values before hitting the DB - bad values here would
     // silently corrupt settings that affect timezone and habit calculations.
     if (fields.theme !== undefined) {
         if (!fields.theme || typeof fields.theme !== 'string' || !VALID_THEMES.includes(fields.theme)) {

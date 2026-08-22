@@ -38,7 +38,7 @@ async function getOverdueTasks(profileId, todayStartISO) {
 // Returns all active habits with today's completion status attached.
 // Two queries: fetch habits, fetch today's logs, merge in JS.
 async function getHabitsWithTodayStatus(profileId, timeZone) {
-    const today = getLocalDateString(timeZone); // 'YYYY-MM-DD' — matches habit_logs.log_date
+    const today = getLocalDateString(timeZone); // 'YYYY-MM-DD' - matches habit_logs.log_date
 
     const [habitsResult, logsResult] = await Promise.all([
         supabase
@@ -63,7 +63,7 @@ async function getHabitsWithTodayStatus(profileId, timeZone) {
     return habitsResult.data.map((habit) => ({
         ...habit,
         completed_today: completedToday.has(habit.id),
-        today_date: today, // the exact local date string used for this check — frontend uses this for un-marking, never computes its own
+        today_date: today, // the exact local date string used for this check - frontend uses this for un-marking, never computes its own
     }));
 }
 
@@ -98,7 +98,7 @@ async function getCalendarEventsForRange(profileId, start, end) {
 
 // --- Main aggregation ---
 // Runs all queries in parallel using Promise.all.
-// timeZone comes from the profile's settings — caller (controller)
+// timeZone comes from the profile's settings - caller (controller)
 // fetches it once and passes it in here.
 async function getDashboardData(profileId, timeZone) {
     const today = getLocalDayBounds(timeZone, 0);

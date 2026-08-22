@@ -3,7 +3,7 @@
 // operators (eq/is/gt/gte/lt/lte/in/contains), ordering, insert/update/
 // delete row returns, and the `habits(...)` join used by the calendar.
 //
-// It is NOT a full Postgres clone — it implements exactly the surface the
+// It is NOT a full Postgres clone - it implements exactly the surface the
 // codebase exercises. Inserted into require.cache so services' `require
 // ('../config/supabase')` resolves to this instead of the real client.
 
@@ -124,7 +124,7 @@ class Query {
       }
     }
 
-    // '*, habits(id, title, target_per_week)' join — nest the parent habit.
+    // '*, habits(id, title, target_per_week)' join - nest the parent habit.
     if (joinMatch && this.table === 'habit_logs' && row.habit_id != null) {
       const habit = this.db.habits.find(h => h.id === row.habit_id);
       if (habit) {

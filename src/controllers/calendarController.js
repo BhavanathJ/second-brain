@@ -10,7 +10,7 @@ async function getCalendarData(req, res) {
     }
 
     // Prevent absurdly large date ranges that would return the entire
-    // database — cap at 90 days (covers a 3-month calendar view max).
+    // database - cap at 90 days (covers a 3-month calendar view max).
     const startDate = new Date(start);
     const endDate = new Date(end);
 

@@ -107,7 +107,7 @@ async function revokeRefreshToken(tokenHash) {
     if (error) throw error;
 }
 
-// Revokes every active refresh token belonging to this user — every
+// Revokes every active refresh token belonging to this user - every
 // device, every profile. Used on password change: an attacker holding
 // a stolen refresh token gets logged out the moment the real owner
 // changes their password, not left with a still-working session.

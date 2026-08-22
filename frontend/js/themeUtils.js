@@ -3,7 +3,7 @@
 // OS/browser's prefers-color-scheme setting.
 //
 // NOTE: the pre-paint <script> in every page's <head> duplicates this
-// exact logic inline — it can't import this module, since it must run
+// exact logic inline - it can't import this module, since it must run
 // synchronously before any module loads (that's what prevents the
 // flash-of-wrong-theme). Keep both in sync if this logic ever changes.
 
@@ -15,7 +15,7 @@ export function resolveTheme(pref) {
 }
 
 // Calls `callback` whenever the OS-level color scheme changes, but
-// only while the stored preference is still 'system' — returns an
+// only while the stored preference is still 'system' - returns an
 // unsubscribe function.
 export function watchSystemTheme(callback) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

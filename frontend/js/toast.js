@@ -1,4 +1,4 @@
-// Shared toast notification system — replaces raw alert() calls across
+// Shared toast notification system - replaces raw alert() calls across
 // every page with a non-blocking, themed notification. Import
 // { showToast } wherever a page currently uses alert().
 

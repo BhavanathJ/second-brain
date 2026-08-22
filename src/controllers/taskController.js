@@ -37,7 +37,7 @@ async function getTask(req, res) {
 
 async function createTask(req, res) {
     // due_at now matches the update endpoint's field name (and the DB
-    // column) — previously this was `dueAt` (camelCase) here while
+    // column) - previously this was `dueAt` (camelCase) here while
     // updateTask used `due_at` (snake_case), same resource, two
     // different conventions depending on which endpoint you hit.
     const { title, description, urgent, important, due_at, status } = req.body;

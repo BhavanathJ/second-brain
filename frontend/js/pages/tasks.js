@@ -160,8 +160,8 @@ function openViewModal(taskId) {
     if (!task) return;
 
     document.getElementById('viewTaskTitle').textContent = task.title;
-    document.getElementById('viewTaskDescription').textContent = task.description ?? '—';
-    document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTime(task.due_at, timeZone) : '—';
+    document.getElementById('viewTaskDescription').textContent = task.description ?? '-';
+    document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTime(task.due_at, timeZone) : '-';
     document.getElementById('viewTaskStatus').textContent = task.status === 'done' ? 'Done' : 'Pending';
     document.getElementById('viewTaskUrgent').checked = task.urgent;
     document.getElementById('viewTaskImportant').checked = task.important;

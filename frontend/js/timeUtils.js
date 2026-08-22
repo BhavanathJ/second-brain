@@ -1,4 +1,4 @@
-// Client-side timezone utilities — same algorithm as src/utils/profileTime.js
+// Client-side timezone utilities - same algorithm as src/utils/profileTime.js
 // on the backend, ported here since that file is a Node CommonJS module.
 // Used wherever the frontend needs to reason about "which local calendar
 // day" something falls on, or convert a local date to the correct UTC
@@ -66,7 +66,7 @@ export function getLocalMidnightUTC(timeZone, dateStr) {
 }
 
 // { startISO, endISO } spanning the entire local calendar month
-// containing `dateStr` — for GET /api/calendar?start=&end=.
+// containing `dateStr` - for GET /api/calendar?start=&end=.
 export function getLocalMonthBounds(timeZone, dateStr) {
     const [y, m] = dateStr.split('-').map(Number);
     const firstOfMonth = `${y}-${String(m).padStart(2, '0')}-01`;
@@ -86,7 +86,7 @@ export function getLocalMonthBounds(timeZone, dateStr) {
 // { startISO, endISO } spanning a single local calendar day.
 export function getLocalDayBounds(timeZone, dateStr) {
     const start = getLocalMidnightUTC(timeZone, dateStr);
-    // End = the NEXT local midnight - 1ms, not start + literal 24h — a
+    // End = the NEXT local midnight - 1ms, not start + literal 24h - a
     // local day isn't exactly 24h across DST transitions.
     const nextStr = addDays(dateStr, 1);
     const end = new Date(getLocalMidnightUTC(timeZone, nextStr).getTime() - 1);
@@ -94,7 +94,7 @@ export function getLocalDayBounds(timeZone, dateStr) {
 }
 
 // Local-week-start date string containing `dateStr`, honoring
-// weekStartsOn (0=Sunday..6=Saturday) — same convention as the
+// weekStartsOn (0=Sunday..6=Saturday) - same convention as the
 // backend's habit-week calculations and the profile's settings.week_starts_on.
 export function getLocalWeekStartDateString(timeZone, weekStartsOn, dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -112,7 +112,7 @@ export function getLocalWeekBounds(timeZone, weekStartsOn, dateStr) {
     const weekEndStr = addDays(weekStartStr, 6);
     const start = getLocalMidnightUTC(timeZone, weekStartStr);
     // End = the first midnight of the day AFTER the week ends - 1ms, not
-    // midnight(weekEndStr) + literal 24h — same DST reasoning as the other
+    // midnight(weekEndStr) + literal 24h - same DST reasoning as the other
     // bounds functions.
     const dayAfterWeekEnd = addDays(weekEndStr, 1);
     const end = new Date(getLocalMidnightUTC(timeZone, dayAfterWeekEnd).getTime() - 1);

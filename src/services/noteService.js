@@ -59,7 +59,7 @@ async function updateNote(profileId, noteId, fields) {
     return data;
 }
 
-// Conditional write — only succeeds if the note is still unconverted.
+// Conditional write - only succeeds if the note is still unconverted.
 // Guards against two concurrent conversion requests both winning: the
 // second one gets `null` back instead of silently overwriting the
 // first request's converted_task_id.

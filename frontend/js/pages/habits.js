@@ -89,7 +89,7 @@ function renderHabitCard(habit) {
 function render() {
     const mount = document.getElementById('habitsList');
     mount.innerHTML = habits.length === 0
-        ? '<div class="dash-empty">No habits yet — add one to start tracking.</div>'
+        ? '<div class="dash-empty">No habits yet - add one to start tracking.</div>'
         : habits.map(renderHabitCard).join('');
     wireEvents();
 }

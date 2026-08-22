@@ -1,7 +1,7 @@
 const supabase = require('../config/supabase');
 
 // Settings has exactly one row per profile (profile_id is the PK).
-// No create/delete needed — the row is created at signup and lives
+// No create/delete needed - the row is created at signup and lives
 // as long as the profile does.
 
 async function getSettings(profileId) {
@@ -30,7 +30,7 @@ async function updateSettings(profileId, fields) {
 // Called once, right after a profile is created (signup's default
 // profile AND every additional profile via POST /api/profiles).
 // All columns except profile_id have DB defaults, so this is a
-// minimal insert — timezone/theme/week_starts_on come from schema.sql.
+// minimal insert - timezone/theme/week_starts_on come from schema.sql.
 async function createDefaultSettings(profileId) {
     const { data, error } = await supabase
         .from('settings')

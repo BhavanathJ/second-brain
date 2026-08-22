@@ -62,7 +62,7 @@ function wireEvents() {
                 await loadBin();
             } catch (err) {
                 // A 404 here specifically means the original item was already
-                // hard-deleted elsewhere — the backend guard from earlier.
+                // hard-deleted elsewhere - the backend guard from earlier.
                 showToast('Failed to restore: ' + err.message);
                 btn.disabled = false;
             }

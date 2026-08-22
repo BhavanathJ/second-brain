@@ -32,7 +32,7 @@ async function createProfile(userId, name) {
     return data;
 }
 
-// Ownership check baked into the query itself — eq('user_id', ...) AND
+// Ownership check baked into the query itself - eq('user_id', ...) AND
 // eq('id', ...) in one call, rather than fetching by id then comparing
 // in JS. A profile that exists but belongs to someone else returns
 // null here, same as a profile that doesn't exist at all.

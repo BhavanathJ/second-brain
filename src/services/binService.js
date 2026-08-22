@@ -17,8 +17,8 @@ async function logDeletion(profileId, entityType, entityId) {
     if (error) throw error;
 }
 
-// bin_entries only stores entity_type/entity_id — not the entity's own
-// title/content — so this batches a second query per entity_type to
+// bin_entries only stores entity_type/entity_id - not the entity's own
+// title/content - so this batches a second query per entity_type to
 // fetch a human-readable label for each entry. Soft-deleted rows still
 // exist in their original table (deleted_at set, row not removed), so
 // this reads them directly, no special "trash" storage involved.
@@ -56,7 +56,7 @@ async function listBinEntries(profileId) {
 
     return data.map(entry => ({
         ...entry,
-        // Truncate — notes' content can be long, titles rarely are.
+        // Truncate - notes' content can be long, titles rarely are.
         // Falls back gracefully if the underlying row is somehow gone
         // (e.g. a race with the purge cron) rather than showing undefined.
         label: (labelMap[entry.entity_id] ?? '(content unavailable)').slice(0, 100),

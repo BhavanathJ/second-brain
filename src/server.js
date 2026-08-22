@@ -19,24 +19,24 @@ const { purgeExpiredEntries } = require('./controllers/binController');
 const app = express();
 
 // Required for express-rate-limit to see the REAL client IP once this
-// is deployed behind Render's reverse proxy — without this, every user
+// is deployed behind Render's reverse proxy - without this, every user
 // would be silently lumped into one shared rate-limit bucket (the
 // proxy's IP), rate-limiting each other instead of themselves.
 app.set('trust proxy', 1);
 
 const allowedOrigins = Array.isArray(config.corsOrigin)
-    ? config.corsOrigin
-    : [config.corsOrigin];
+  ? config.corsOrigin
+  : [config.corsOrigin];
 
 app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
 }));
 app.use(express.json());
 

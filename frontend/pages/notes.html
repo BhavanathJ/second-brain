@@ -4,17 +4,16 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Notes — Second Brain</title>
+    <title>Notes - Second Brain</title>
     <script>
-        (function () {
-            var pref = localStorage.getItem('theme') || 'system';
-            var resolved = pref === 'system'
-                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-                : pref;
-            document.documentElement.setAttribute('data-theme', resolved);
-        })();
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
+        rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="../css/app.css" rel="stylesheet" />
 </head>
@@ -89,13 +88,16 @@
                     <div class="modal-body">
                         <input type="hidden" id="convertNoteId" />
                         <div class="mb-3">
-                            <label class="form-label" for="convertTaskTitle">Task Title <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="convertTaskTitle" required placeholder="Enter a title for this task" />
+                            <label class="form-label" for="convertTaskTitle">Task Title <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="convertTaskTitle" required
+                                placeholder="Enter a title for this task" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="convertTaskDescription">Description</label>
                             <textarea class="form-control" id="convertTaskDescription" rows="5"></textarea>
-                            <div class="form-text">The full note content is used as the description. You can edit it if needed.</div>
+                            <div class="form-text">The full note content is used as the description. You can edit it if
+                                needed.</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="convertTaskDueAt">Due Date & Time (optional)</label>

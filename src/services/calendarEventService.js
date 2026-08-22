@@ -96,7 +96,7 @@ async function hardDeleteCalendarEvent(profileId, eventId) {
     if (error) throw error;
 }
 
-// Used by the unified /api/calendar endpoint — fetches events
+// Used by the unified /api/calendar endpoint - fetches events
 // within a date range for the calendar view.
 async function getEventsForRange(profileId, startDate, endDate) {
     const { data, error } = await supabase

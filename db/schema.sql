@@ -1,7 +1,7 @@
 -- ============================================================
--- SECOND BRAIN — FULL SCHEMA (locked)
+-- SECOND BRAIN - FULL SCHEMA (locked)
 -- Principle: every feature has ONE owning table. Calendar and
--- Dashboard never store data — they only query/combine tables
+-- Dashboard never store data - they only query/combine tables
 -- that already exist (Tasks, Habits, Notes, Reminders, Calendar
 -- events). No duplication, no sync logic needed anywhere.
 -- ============================================================
@@ -17,7 +17,7 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Netflix-style profiles. This is the hard isolation boundary —
+-- Netflix-style profiles. This is the hard isolation boundary -
 -- every content table below points at profile_id, never user_id.
 CREATE TABLE profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -54,7 +54,7 @@ CREATE TABLE settings (
 );
 
 -- ----------------------------
--- TASKS (owns Eisenhower Matrix too — urgent/important are just columns)
+-- TASKS (owns Eisenhower Matrix too - urgent/important are just columns)
 -- ----------------------------
 
 CREATE TABLE tasks (
@@ -95,13 +95,13 @@ CREATE INDEX idx_notes_profile_active ON notes (profile_id) WHERE deleted_at IS 
 CREATE INDEX idx_notes_tags ON notes USING GIN (tags);
 
 -- ----------------------------
--- HABITS — weekly-quota model (locked).
+-- HABITS - weekly-quota model (locked).
 -- target_per_week = how many completions needed in a Sun-Sat window.
--- "Goal reached?" is NEVER stored — always computed live:
+-- "Goal reached?" is NEVER stored - always computed live:
 --   COUNT(habit_logs WHERE habit_id=X AND completed=true
 --         AND log_date BETWEEN <this week's Sunday> AND <this week's Saturday>)
 --   compared against target_per_week. No cached flag, so it can't drift.
--- Calendar reads habit_logs directly for the day-checkbox — same row,
+-- Calendar reads habit_logs directly for the day-checkbox - same row,
 -- no duplication (Option A principle).
 -- ----------------------------
 
@@ -128,7 +128,7 @@ CREATE INDEX idx_habitlogs_profile_date ON habit_logs (profile_id, log_date);
 
 -- ----------------------------
 -- CALENDAR-ONLY EVENTS
--- For things that are ONLY ever a calendar entry — not a task,
+-- For things that are ONLY ever a calendar entry - not a task,
 -- not a habit. e.g. "Dentist appointment, 3pm-4pm".
 -- ----------------------------
 
@@ -147,7 +147,7 @@ CREATE INDEX idx_calendar_profile_active ON calendar_events (profile_id) WHERE d
 CREATE INDEX idx_calendar_starts ON calendar_events (profile_id, starts_at) WHERE deleted_at IS NULL;
 
 -- ----------------------------
--- REMINDERS (standalone AND attachable — one table, nullable link)
+-- REMINDERS (standalone AND attachable - one table, nullable link)
 -- entity_type/entity_id NULL = standalone.
 -- entity_type='task'|'habit'|'calendar_event', entity_id = that row's id = attached.
 -- ----------------------------
@@ -158,7 +158,7 @@ CREATE TABLE reminders (
   title TEXT NOT NULL,
   remind_at TIMESTAMPTZ NOT NULL,
   entity_type TEXT,   -- NULL | 'task' | 'habit' | 'calendar_event' | 'note'
-  entity_id UUID,      -- not a real FK (entity_type decides target table) — app-enforced
+  entity_id UUID,      -- not a real FK (entity_type decides target table) - app-enforced
   is_done BOOLEAN NOT NULL DEFAULT false,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -168,7 +168,7 @@ CREATE INDEX idx_reminders_profile_active ON reminders (profile_id) WHERE delete
 CREATE INDEX idx_reminders_due ON reminders (profile_id, remind_at) WHERE deleted_at IS NULL AND is_done = false;
 
 -- ----------------------------
--- BIN — single log every soft-delete writes to, across all features.
+-- BIN - single log every soft-delete writes to, across all features.
 -- entity_id is NOT a real FK for the same reason as reminders above:
 -- it can point at tasks, notes, habits, calendar_events, or reminders.
 -- ----------------------------

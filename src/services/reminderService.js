@@ -96,7 +96,7 @@ async function hardDeleteReminder(profileId, reminderId) {
     if (error) throw error;
 }
 
-// Called by cron job every minute — fires across all profiles at once.
+// Called by cron job every minute - fires across all profiles at once.
 async function fireReminders() {
     const { data, error } = await supabase
         .from('reminders')

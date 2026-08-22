@@ -34,7 +34,7 @@ function refStreak(logSet, target, timeZone, weekStartsOn, now) {
   const ws = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
   const today = getLocalDateString(timeZone, now);
   let s = 0;
-  // walk backward from the PREVIOUS week — max 51 so the current week can
+  // walk backward from the PREVIOUS week - max 51 so the current week can
   // add one more and still respect the implementation's 52-week cap.
   let w = addDaysToDateString(ws, -7);
   for (let i = 0; i < 51; i++) {
@@ -73,7 +73,7 @@ function genPattern(tz, weekStartsOn, now, weeksBack, target, rnd) {
   const windowStart = addDaysToDateString(ws, -7 * (weeksBack - 1));
   let w = windowStart;
   for (let i = 0; i < weeksBack; i++) {
-    const weekCount = Math.min(7, Math.floor(rnd() * (target + 2))); // 0..min(7, target+1) — 7 days/week
+    const weekCount = Math.min(7, Math.floor(rnd() * (target + 2))); // 0..min(7, target+1) - 7 days/week
     const shuffled = [0, 1, 2, 3, 4, 5, 6];
     for (let j = shuffled.length - 1; j > 0; j--) {
       const k = Math.floor(rnd() * (j + 1));
@@ -204,7 +204,7 @@ section('Streak window covers exactly 52 weeks');
 
   // perfect 52-week logging ending at ws: streak must be 52, and a log one
   // day BEFORE windowStart must not extend it (it is outside the window, so
-  // the implementation can't see it — by design).
+  // the implementation can't see it - by design).
   const set = new Set();
   let w = windowStart;
   for (let i = 0; i < 52; i++) {

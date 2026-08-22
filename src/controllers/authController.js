@@ -136,12 +136,12 @@ async function logout(req, res) {
 }
 
 // Changes the logged-in user's password. Requires the CURRENT password
-// (not just a valid session) — prevents someone who's grabbed an
+// (not just a valid session) - prevents someone who's grabbed an
 // unlocked, logged-in browser from locking the real owner out by
 // silently changing the password with no proof of knowing the old one.
 //
 // On success, revokes every refresh token for this user (all devices,
-// all profiles) — see revokeAllRefreshTokensForUser for why. The
+// all profiles) - see revokeAllRefreshTokensForUser for why. The
 // current request's own tokens are NOT reissued here; the frontend
 // must log the user back in with the new password.
 async function changePassword(req, res) {

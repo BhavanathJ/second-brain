@@ -16,7 +16,7 @@ async function getTasksForRange(profileId, startDate, endDate) {
 }
 
 // '*, habits(id, title, target_per_week)' is Supabase's foreign key join
-// syntax — works because habit_logs.habit_id references habits.id.
+// syntax - works because habit_logs.habit_id references habits.id.
 // Returns each log with its parent habit nested inside, so the frontend
 // knows which habit each log belongs to without a second request.
 async function getHabitLogsForRange(profileId, startDate, endDate) {
@@ -47,7 +47,7 @@ async function getRemindersForRange(profileId, startDate, endDate) {
     return data;
 }
 
-// Runs all four queries in parallel — total wait time is the slowest
+// Runs all four queries in parallel - total wait time is the slowest
 // single query, not the sum of all four.
 async function getCalendarData(profileId, startDate, endDate) {
     const [tasks, habitLogs, calendarEvents, reminders] = await Promise.all([

@@ -66,7 +66,7 @@ async function getHabit(req, res) {
 }
 
 async function createHabit(req, res) {
-    // target_per_week now matches updateHabit's field name — previously
+    // target_per_week now matches updateHabit's field name - previously
     // camelCase here (targetPerWeek) while update used snake_case,
     // same mismatch pattern as tasks/reminders/calendar_events had.
     const { title, target_per_week } = req.body;
@@ -158,7 +158,7 @@ async function logCompletion(req, res) {
         }
 
         const parsedDate = new Date(date + 'T00:00:00Z');
-        // isNaN alone isn't enough — JS silently rolls invalid calendar dates
+        // isNaN alone isn't enough - JS silently rolls invalid calendar dates
         // like Feb 30 into a different valid date (e.g. Mar 2) instead of
         // rejecting them. Re-serializing and comparing back to the original
         // string catches this: a genuinely valid date round-trips exactly,
@@ -203,7 +203,7 @@ async function deleteLog(req, res) {
     }
 
     const parsedDate = new Date(date + 'T00:00:00Z');
-    // isNaN alone isn't enough — JS silently rolls invalid calendar dates
+    // isNaN alone isn't enough - JS silently rolls invalid calendar dates
     // like Feb 30 into a different valid date (e.g. Mar 2) instead of
     // rejecting them. Re-serializing and comparing back to the original
     // string catches this: a genuinely valid date round-trips exactly,
@@ -245,7 +245,7 @@ async function getLogs(req, res) {
 
     const parsedStart = new Date(start + 'T00:00:00Z');
     const parsedEnd = new Date(end + 'T00:00:00Z');
-    // isNaN alone isn't enough — JS silently rolls invalid calendar dates
+    // isNaN alone isn't enough - JS silently rolls invalid calendar dates
     // like Feb 30 into a different valid date (e.g. Mar 2) instead of
     // rejecting them. Re-serializing and comparing back to the original
     // string catches this: a genuinely valid date round-trips exactly,

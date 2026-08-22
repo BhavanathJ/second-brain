@@ -3,7 +3,7 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 
 // On success, the backend has revoked every refresh token for this
-// user — including the one this session is using. Staying "logged in"
+// user - including the one this session is using. Staying "logged in"
 // afterward would be misleading, so log out immediately and send the
 // user to a clean re-login instead.
 async function handleChangePassword(e) {

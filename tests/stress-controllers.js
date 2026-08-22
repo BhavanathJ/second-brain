@@ -8,7 +8,7 @@
 //
 // "Today" is the real clock (2026-08-09). Because the current week is
 // partial, streak/weekly-count expectations are computed from an
-// INDEPENDENT DB-based reference (raw seeded logs), not hard-coded — that
+// INDEPENDENT DB-based reference (raw seeded logs), not hard-coded - that
 // also makes the whole file weekday-agnostic.
 
 const { check, section, summary, makeReqRes, mock } = require('./helpers');
@@ -325,24 +325,24 @@ function refStreakFromDb(habitId, target, ws) {
   }
 
   // ================= KNOWN VALIDATION GAPS (demonstrations) =================
-  section('Known validation gaps — current behavior (documented, not fixed)');
+  section('Known validation gaps - current behavior (documented, not fixed)');
   {
     const today = getLocalDateString(TZ);
     const r1 = await call(habitController.logCompletion, { params: { id: hThree.id }, body: { date: 'not-a-real-date' } });
     console.log(`  [gap] habit log with a non-date string    → HTTP ${r1.status} ${r1.body && r1.body.error ? `(${r1.body.error})` : '(mock stores it; real Postgres would reject with a 22P02 → 500)'}`);
     const r2 = await call(habitController.logCompletion, { params: { id: hThree.id }, body: { date: '2027-01-01' } });
-    console.log(`  [gap] habit log dated ~5 months in future → HTTP ${r2.status} (accepted — inflates nothing now, but pollutes history)`);
+    console.log(`  [gap] habit log dated ~5 months in future → HTTP ${r2.status} (accepted - inflates nothing now, but pollutes history)`);
     const r3 = await call(habitController.getLogs, { params: { id: hThree.id }, query: { start: 'bogus', end: 'bogus' } });
     console.log(`  [gap] habit logs range with bad dates     → HTTP ${r3.status} (mock string-compares leniently; real Postgres → 500)`);
     const r4 = await call(taskController.updateTask, { params: { id: 'definitely-missing' }, body: { title: 'x' } });
-    console.log(`  [gap] update non-existent task            → HTTP ${r4.status} (safe — 404 via filter)`);
+    console.log(`  [gap] update non-existent task            → HTTP ${r4.status} (safe - 404 via filter)`);
     const r5 = await call(taskController.createTask, { body: { title: 'bad status task', status: 'bogus' } });
     console.log(`  [gap] task with invalid status            → HTTP ${r5.status} (status "bogus" stored verbatim, not in {pending,done})`);
     const r6 = await call(calendarEventController.createCalendarEvent, { body: { title: 'e', starts_at: '2026-08-09T10:00:00Z', ends_at: '2026-08-09T09:00:00Z' } });
     console.log(`  [gap] new event ends before it starts     → HTTP ${r6.status} (rejected on create)`);
     const created = await call(calendarEventController.createCalendarEvent, { body: { title: 'real event', starts_at: '2026-08-09T10:00:00Z' } });
     const r7 = await call(calendarEventController.updateCalendarEvent, { params: { id: created.body.event.id }, body: { ends_at: '2026-08-09T09:00:00Z' } });
-    console.log(`  [gap] event UPDATE can set ends < starts  → HTTP ${r7.status} (accepted — create validates, update does not)`);
+    console.log(`  [gap] event UPDATE can set ends < starts  → HTTP ${r7.status} (accepted - create validates, update does not)`);
     const r8 = await call(settingsController.updateSettings, { body: { theme: '' } });
     console.log(`  [gap] settings with empty theme           → HTTP ${r8.status} (empty string bypasses the truthiness check)`);
   }

@@ -65,7 +65,7 @@ function getLocalRangeBounds(timeZone, days, now = new Date()) {
     return { start, end };
 }
 
-// Pure calendar-date arithmetic, no timezone conversion needed —
+// Pure calendar-date arithmetic, no timezone conversion needed -
 // just moving N days along a date string.
 function addDaysToDateString(dateStr, days) {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -73,7 +73,7 @@ function addDaysToDateString(dateStr, days) {
     return dt.toISOString().split('T')[0];
 }
 
-// The local week-start as a 'YYYY-MM-DD' string, not a UTC instant —
+// The local week-start as a 'YYYY-MM-DD' string, not a UTC instant -
 // what habit_logs.log_date comparisons need directly, since log_date
 // is a DATE column with no time component.
 function getLocalWeekStartDateString(timeZone, weekStartsOn, date = new Date()) {
@@ -86,7 +86,7 @@ function getLocalWeekStartDateString(timeZone, weekStartsOn, date = new Date()) 
     return asUTCDate.toISOString().split('T')[0];
 }
 
-// UTC instant of the local-week start — built on the date-string
+// UTC instant of the local-week start - built on the date-string
 // version above, same result as before, just no duplicated week-math.
 function getLocalWeekStart(timeZone, weekStartsOn, date = new Date()) {
     const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, date);

@@ -86,7 +86,7 @@ function wireItemEvents() {
         btn.addEventListener('click', () => openConvertModal(btn.dataset.id, btn.dataset.content));
     });
 
-    // Keyboard-accessible expand/collapse — a real <button>, not a click
+    // Keyboard-accessible expand/collapse - a real <button>, not a click
     // handler on the text itself, so Tab/Enter/Space work and screen
     // readers get a proper aria-expanded announcement.
     document.querySelectorAll('.note-toggle-btn').forEach(btn => {
@@ -101,7 +101,7 @@ function wireItemEvents() {
     updateNoteToggleVisibility();
 }
 
-// Only show "Show more" on notes that are ACTUALLY clamped — a short
+// Only show "Show more" on notes that are ACTUALLY clamped - a short
 // note doesn't need a toggle button that does nothing. Must run after
 // the DOM has actually laid out the clamped text (requestAnimationFrame
 // waits for the next paint), or scrollHeight/clientHeight would still
@@ -175,7 +175,7 @@ async function handleConvertSubmit(e) {
         showToast('Converted to task', 'success');
         await loadNotes(currentFilterTags());
     } catch (err) {
-        // 409 = already converted (e.g. by another tab) — refresh to show the real state
+        // 409 = already converted (e.g. by another tab) - refresh to show the real state
         showToast(err.message);
         await loadNotes(currentFilterTags());
     }

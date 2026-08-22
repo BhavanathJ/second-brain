@@ -28,7 +28,7 @@ async function createProfile(req, res) {
         }
 
         const profile = await profileService.createProfile(req.userId, name.trim());
-        // Every profile needs exactly one settings row — created here,
+        // Every profile needs exactly one settings row - created here,
         // not lazily, so Settings never 404s for a profile that exists.
         await settingsService.createDefaultSettings(profile.id);
 
@@ -40,7 +40,7 @@ async function createProfile(req, res) {
 }
 
 // Switches the active session to a different one of the user's own
-// profiles. Issues a brand new token pair scoped to that profile —
+// profiles. Issues a brand new token pair scoped to that profile -
 // this is the endpoint that actually exercises the refresh_tokens
 // profile_id fix: the new refresh token is stored with this profileId,
 // so it stays correct across future silent refreshes.

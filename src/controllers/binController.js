@@ -5,7 +5,7 @@ const reminderService = require('../services/reminderService');
 const habitService = require('../services/habitService');
 const calendarEventService = require('../services/calendarEventService');
 
-// Option B restore map — add one line here whenever a new feature is built.
+// Option B restore map - add one line here whenever a new feature is built.
 const entityHandlers = {
     task: {
         restore: taskService.restoreTask,
@@ -54,7 +54,7 @@ async function restoreEntry(req, res) {
 
         // restore() returns null if the underlying row is already gone
         // (hard-deleted elsewhere). Don't remove the bin entry in that
-        // case — that would silently "lose" the item with a 200 response
+        // case - that would silently "lose" the item with a 200 response
         // even though nothing was actually restored.
         const restored = await handler.restore(req.profileId, entry.entity_id);
         if (!restored) {

@@ -4,17 +4,16 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tasks — Second Brain</title>
+    <title>Tasks - Second Brain</title>
     <script>
-        (function () {
-            var pref = localStorage.getItem('theme') || 'system';
-            var resolved = pref === 'system'
-                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-                : pref;
-            document.documentElement.setAttribute('data-theme', resolved);
-        })();
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
+        rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="../css/app.css" rel="stylesheet" />
 </head>
@@ -112,7 +111,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Description</label>
-                        <div id="viewTaskDescription" class="form-control-plaintext" style="white-space: pre-wrap; min-height: 60px;"></div>
+                        <div id="viewTaskDescription" class="form-control-plaintext"
+                            style="white-space: pre-wrap; min-height: 60px;"></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Due Date</label>
@@ -134,7 +134,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                        data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-primary btn-sm" id="viewTaskEditBtn">Edit</button>
                 </div>
             </div>

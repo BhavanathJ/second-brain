@@ -1,7 +1,6 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
-import { resolveTheme } from '../themeUtils.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -20,7 +19,6 @@ function populateTimezoneSelect(currentTimezone) {
 async function loadSettings() {
     const { settings } = await apiFetch('/settings');
     populateTimezoneSelect(settings.timezone);
-    document.getElementById('themeSelect').value = settings.theme;
     document.getElementById('weekStartSelect').value = String(settings.week_starts_on);
 }
 
@@ -39,19 +37,14 @@ async function handleSubmit(e) {
     e.preventDefault();
     const payload = {
         timezone: document.getElementById('timezoneSelect').value,
-        theme: document.getElementById('themeSelect').value,
         week_starts_on: Number(document.getElementById('weekStartSelect').value),
     };
 
     try {
         await apiFetch('/settings', { method: 'PATCH', body: JSON.stringify(payload) });
 
-        // Resolve the raw pref (light/dark/system) to an actual display value
-        // before writing data-theme — CSS only matches "light"/"dark", so
-        // writing "system" raw would fall back to the default until reload.
-        // The RAW pref is still cached in localStorage for pre-paint theme reads.
-        document.documentElement.setAttribute('data-theme', resolveTheme(payload.theme));
-        localStorage.setItem('theme', payload.theme);
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
 
         const msg = document.getElementById('saveMsg');
         msg.classList.add('visible');

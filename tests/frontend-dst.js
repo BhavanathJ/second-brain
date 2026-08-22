@@ -43,7 +43,7 @@ function oldEnd(midnightInstant) {
 (async () => {
   const tu = await loadFrontendTimeUtils();
 
-  section('Day bounds on DST days — frontend vs backend');
+  section('Day bounds on DST days - frontend vs backend');
   {
     const cases = [
       ['2026-03-08', 'spring-forward (23h day)', 23],
@@ -71,7 +71,7 @@ function oldEnd(midnightInstant) {
     }
   }
 
-  section('Real user impact — no more wrong-day bucketing');
+  section('Real user impact - no more wrong-day bucketing');
   {
     // A task due 23:30 local the night BEFORE spring-forward. The fixed
     // frontend must NOT show it on Mar-8's day view (only the backend's true
@@ -109,7 +109,7 @@ function oldEnd(midnightInstant) {
     check(wb.endISO === trueEnd.toISOString(), 'normal week end exact', `got ${fmt(wb.endISO)}`);
   }
 
-  section('Month bounds — 10-year scan where last day of month hits a transition (Europe/Berlin)');
+  section('Month bounds - 10-year scan where last day of month hits a transition (Europe/Berlin)');
   {
     // Berlin transitions on the LAST Sunday of March and October, so a month
     // whose last day IS that Sunday is the case the old month formula got

@@ -2,7 +2,7 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 
 // Basic HTML-escaping for any user-supplied text (task titles, note
-// content, etc.) before it goes into innerHTML — without this, a task
+// content, etc.) before it goes into innerHTML - without this, a task
 // titled "<img src=x onerror=alert(1)>" would execute as real HTML.
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -29,7 +29,7 @@ function formatDate(isoString, timeZone) {
 }
 
 function renderEmpty(label) {
-    return `<div class="dash-empty">No ${label} — nice.</div>`;
+    return `<div class="dash-empty">No ${label} - nice.</div>`;
 }
 
 function renderTasks(tasks, timeZone) {
@@ -63,7 +63,7 @@ function renderEvents(events, timeZone) {
 }
 
 // Habits with completed_today=true get an "Undo" button using
-// today_date — the exact local date string the SERVER computed and
+// today_date - the exact local date string the SERVER computed and
 // returned alongside completed_today. Never guessed client-side.
 function renderHabits(habits) {
     if (habits.length === 0) return renderEmpty('habits');
@@ -139,14 +139,14 @@ async function loadDashboard(timeZone) {
     renderMixedList('tomorrowItems', data.tomorrow, timeZone);
     renderMixedList('next7Items', data.next_7_days, timeZone);
 
-    // Wire up "Mark done" and "Undo" buttons — re-attached every render
+    // Wire up "Mark done" and "Undo" buttons - re-attached every render
     // since buttons are recreated each time the dashboard reloads.
     document.querySelectorAll('.habit-done-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             btn.disabled = true;
             try {
                 await markHabitDone(btn.dataset.habitId);
-                await loadDashboard(timeZone); // full reload — simplest way to keep counts/streaks in sync
+                await loadDashboard(timeZone); // full reload - simplest way to keep counts/streaks in sync
             } catch (err) {
                 alert('Failed to mark habit done: ' + err.message);
                 btn.disabled = false;
@@ -159,7 +159,7 @@ async function loadDashboard(timeZone) {
             btn.disabled = true;
             try {
                 // Uses the exact date string the server returned in
-                // today_date — never computed client-side. If it no
+                // today_date - never computed client-side. If it no
                 // longer matches (e.g. midnight passed since page load),
                 // the DELETE simply finds no matching log and 404s harmlessly.
                 await unmarkHabitDone(btn.dataset.habitId, btn.dataset.logDate);

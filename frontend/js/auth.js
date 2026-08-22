@@ -1,19 +1,6 @@
 import { apiFetch } from './api.js';
 
-// --- Pre-login theme selector (localStorage only — no /settings to fetch from yet) ---
-const themeSelect = document.getElementById('preLoginThemeSelect');
-themeSelect.value = localStorage.getItem('theme') || 'system';
-
-themeSelect.addEventListener('change', () => {
-    const pref = themeSelect.value;
-    localStorage.setItem('theme', pref);
-    const resolved = pref === 'system'
-        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-        : pref;
-    document.documentElement.setAttribute('data-theme', resolved);
-});
-
-// --- Show/hide password toggles — works for any field via data-target ---
+// --- Show/hide password toggles - works for any field via data-target ---
 document.querySelectorAll('.toggle-password-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
         const field = document.getElementById(btn.dataset.target);

@@ -28,8 +28,6 @@ async function createProfile(req, res) {
         }
 
         const profile = await profileService.createProfile(req.userId, name.trim());
-        // Every profile needs exactly one settings row — created here,
-        // not lazily, so Settings never 404s for a profile that exists.
         await settingsService.createDefaultSettings(profile.id);
 
         return res.status(201).json({ profile });
@@ -39,11 +37,6 @@ async function createProfile(req, res) {
     }
 }
 
-// Switches the active session to a different one of the user's own
-// profiles. Issues a brand new token pair scoped to that profile —
-// this is the endpoint that actually exercises the refresh_tokens
-// profile_id fix: the new refresh token is stored with this profileId,
-// so it stays correct across future silent refreshes.
 async function selectProfile(req, res) {
     try {
         const profile = await profileService.findProfileForUser(req.userId, req.params.id);
@@ -60,4 +53,57 @@ async function selectProfile(req, res) {
     }
 }
 
-module.exports = { listProfiles, createProfile, selectProfile };
+async function renameProfile(req, res) {
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Profile name is required.' });
+    }
+
+    try {
+        const profile = await profileService.renameProfile(req.userId, req.params.id, name.trim());
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found.' });
+        }
+        return res.status(200).json({ profile });
+    } catch (err) {
+        console.error('Rename profile error:', err);
+        return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
+}
+
+// Cascade-deletes ALL of this profile's data — irreversible. Blocked
+// if it's the caller's currently active profile (req.profileId, from
+// the access token) — deleting the profile you're signed into would
+// leave your current session referencing a profile that no longer
+// exists. Also blocked if it's the user's last remaining profile —
+// every account must always have at least one.
+async function deleteProfile(req, res) {
+    const targetProfileId = req.params.id;
+
+    if (targetProfileId === req.profileId) {
+        return res.status(400).json({
+            error: 'Cannot delete the profile you are currently using. Switch to a different profile first.',
+        });
+    }
+
+    try {
+        const profile = await profileService.findProfileForUser(req.userId, targetProfileId);
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found.' });
+        }
+
+        const count = await profileService.countProfilesForUser(req.userId);
+        if (count <= 1) {
+            return res.status(400).json({ error: 'Cannot delete your only remaining profile.' });
+        }
+
+        await profileService.deleteProfile(req.userId, targetProfileId);
+        return res.status(204).send();
+    } catch (err) {
+        console.error('Delete profile error:', err);
+        return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
+}
+
+module.exports = { listProfiles, createProfile, selectProfile, renameProfile, deleteProfile };

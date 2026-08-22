@@ -32,10 +32,6 @@ async function createProfile(userId, name) {
     return data;
 }
 
-// Ownership check baked into the query itself — eq('user_id', ...) AND
-// eq('id', ...) in one call, rather than fetching by id then comparing
-// in JS. A profile that exists but belongs to someone else returns
-// null here, same as a profile that doesn't exist at all.
 async function findProfileForUser(userId, profileId) {
     const { data, error } = await supabase
         .from('profiles')
@@ -48,9 +44,38 @@ async function findProfileForUser(userId, profileId) {
     return data;
 }
 
+async function renameProfile(userId, profileId, name) {
+    const { data, error } = await supabase
+        .from('profiles')
+        .update({ name })
+        .eq('user_id', userId)
+        .eq('id', profileId)
+        .select()
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
+// Cascade-deletes every task/note/habit/reminder/event/bin-entry/
+// settings row tied to this profile, via the DB's ON DELETE CASCADE —
+// irreversible, no soft-delete, no Bin recovery. Callers must have
+// already confirmed this is genuinely intended (see profileController).
+async function deleteProfile(userId, profileId) {
+    const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId)
+        .eq('id', profileId);
+
+    if (error) throw error;
+}
+
 module.exports = {
     listProfilesForUser,
     countProfilesForUser,
     createProfile,
     findProfileForUser,
+    renameProfile,
+    deleteProfile,
 };

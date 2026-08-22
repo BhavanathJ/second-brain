@@ -30,7 +30,7 @@ async function getTaskById(profileId, taskId) {
     return data;
 }
 
-async function createTask(profileId, { title, description, urgent, important, due_at }) {
+async function createTask(profileId, { title, description, urgent, important, due_at, status }) {
     const { data, error } = await supabase
         .from('tasks')
         .insert({
@@ -40,6 +40,7 @@ async function createTask(profileId, { title, description, urgent, important, du
             urgent: urgent ?? false,
             important: important ?? false,
             due_at: due_at ?? null,
+            status: status ?? 'pending',
         })
         .select()
         .single();

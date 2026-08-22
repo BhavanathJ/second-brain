@@ -64,6 +64,25 @@ async function updateCalendarEvent(req, res) {
         return res.status(400).json({ error: 'No valid fields to update.' });
     }
 
+    // Validate that ends_at is after starts_at if both are provided
+    // Need to check against existing values if only one is being updated
+    if (fields.starts_at || fields.ends_at) {
+        try {
+            const existingEvent = await calendarEventService.getCalendarEventById(req.profileId, req.params.id);
+            if (!existingEvent) {
+                return res.status(404).json({ error: 'Calendar event not found.' });
+            }
+            const startsAt = fields.starts_at ?? existingEvent.starts_at;
+            const endsAt = fields.ends_at ?? existingEvent.ends_at;
+            if (endsAt && new Date(endsAt) <= new Date(startsAt)) {
+                return res.status(400).json({ error: 'ends_at must be after starts_at.' });
+            }
+        } catch (err) {
+            console.error('Update calendar event validation error:', err);
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        }
+    }
+
     try {
         const event = await calendarEventService.updateCalendarEvent(
             req.profileId,

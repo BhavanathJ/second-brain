@@ -157,8 +157,13 @@ async function logCompletion(req, res) {
             return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
         }
 
-        const parsedDate = new Date(date + 'T00:00:00');
-        if (isNaN(parsedDate.getTime())) {
+        const parsedDate = new Date(date + 'T00:00:00Z');
+        // isNaN alone isn't enough — JS silently rolls invalid calendar dates
+        // like Feb 30 into a different valid date (e.g. Mar 2) instead of
+        // rejecting them. Re-serializing and comparing back to the original
+        // string catches this: a genuinely valid date round-trips exactly,
+        // an overflowed one won't match what was typed.
+        if (isNaN(parsedDate.getTime()) || parsedDate.toISOString().split('T')[0] !== date) {
             return res.status(400).json({ error: 'Invalid date value.' });
         }
 
@@ -197,8 +202,13 @@ async function deleteLog(req, res) {
         return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
 
-    const parsedDate = new Date(date + 'T00:00:00');
-    if (isNaN(parsedDate.getTime())) {
+    const parsedDate = new Date(date + 'T00:00:00Z');
+    // isNaN alone isn't enough — JS silently rolls invalid calendar dates
+    // like Feb 30 into a different valid date (e.g. Mar 2) instead of
+    // rejecting them. Re-serializing and comparing back to the original
+    // string catches this: a genuinely valid date round-trips exactly,
+    // an overflowed one won't match what was typed.
+    if (isNaN(parsedDate.getTime()) || parsedDate.toISOString().split('T')[0] !== date) {
         return res.status(400).json({ error: 'Invalid date value.' });
     }
 
@@ -233,9 +243,15 @@ async function getLogs(req, res) {
         return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
 
-    const parsedStart = new Date(start + 'T00:00:00');
-    const parsedEnd = new Date(end + 'T00:00:00');
-    if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+    const parsedStart = new Date(start + 'T00:00:00Z');
+    const parsedEnd = new Date(end + 'T00:00:00Z');
+    // isNaN alone isn't enough — JS silently rolls invalid calendar dates
+    // like Feb 30 into a different valid date (e.g. Mar 2) instead of
+    // rejecting them. Re-serializing and comparing back to the original
+    // string catches this: a genuinely valid date round-trips exactly,
+    // an overflowed one won't match what was typed.
+    if (isNaN(parsedStart.getTime()) || parsedStart.toISOString().split('T')[0] !== start ||
+        isNaN(parsedEnd.getTime()) || parsedEnd.toISOString().split('T')[0] !== end) {
         return res.status(400).json({ error: 'Invalid date value.' });
     }
 

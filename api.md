@@ -168,3 +168,17 @@ No query params - returns `{ today, tomorrow, next_7_days, overdue }`, all compu
 - `timezone` validated against `Intl.supportedValuesOf('timeZone')` (must be a real IANA name).
 - `theme` must be `light` or `dark`.
 - `week_starts_on` must be `0` (Sunday) or `1` (Monday).
+
+---
+
+## AI Assistant (`/api/ai`) - requires auth
+
+| Method | Path | Body |
+|---|---|---|
+| GET | `/ai/context` | - |
+| POST | `/ai/chat` | `{ messages, providerConfig?, includeContext? }` |
+| POST | `/ai/test` | `{ providerConfig }` |
+
+- `GET /ai/context`: Returns formatted markdown context of active tasks by quadrant, habit streaks, notes, calendar events, and reminders along with count totals.
+- `POST /ai/chat`: Injects profile context into the system prompt and forwards the query to the user's configured LLM provider (LiteLLM, OpenAI, Groq, OpenRouter, Ollama, or Custom URL).
+- `POST /ai/test`: Pings the target LLM endpoint to verify network reachability and authentication.

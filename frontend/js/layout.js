@@ -1,5 +1,6 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
+import { initAiOverlay } from './aiOverlay.js';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'dashboard.html', page: 'dashboard' },
@@ -123,6 +124,7 @@ export async function initLayout(activePage) {
 
     await populateProfileSwitcher(profileId);
     initLogout();
+    initAiOverlay();
 
     return { profileId };
 }

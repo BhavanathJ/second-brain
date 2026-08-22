@@ -1,192 +1,171 @@
-# Second Brain
+# Second Brain 🧠
 
-A personal second-brain app: capture notes, manage tasks on an Eisenhower matrix, track weekly habits, keep a unified calendar, set reminders, and recycle anything through a 30-day bin - all behind a Netflix-style multi-profile login.
+A personal second-brain application built with a modern **Neobrutalism** aesthetic. Capture notes, organize tasks on an Eisenhower matrix, track weekly habit streaks, maintain a unified calendar, set up recurring reminders, and recycle soft-deleted items through a 30-day bin — all secured behind a Netflix-style multi-profile login.
 
-Backend (this repo) is a Node.js/Express API backed by **Supabase (Postgres)**. The frontend is a dependency-free vanilla-JS static app served separately.
-
----
-
-## Features
-
-| Feature | What it does |
-|---|---|
-| **Auth & profiles** | Email/password signup & login, refresh-token sessions, logout, change password. Up to **5 profiles** per account (netflix-style), each with fully isolated data. |
-| **Tasks** | Eisenhower matrix (urgent / important), `pending`/`done` status, due dates. A task with a `due_at` automatically appears on the calendar. |
-| **Notes** | Free-text capture with tags. **Convert a note to a task** - it links (never copies), so the task keeps a pointer back to the note. |
-| **Habits** | Weekly-quota model (`target_per_week`, e.g. 7 = daily, 3 = 3×/week). Log completions per day; streaks are **computed live** from `habit_logs` (never stored, so they can't drift), capped at a 52-week window. |
-| **Calendar** | Unified day/week/month view combining tasks-with-due-dates, habit day checkboxes (read straight from `habit_logs`), and calendar-only events. Timezone/DST-correct day bounds. |
-| **Reminders** | Standalone or attached to a task/habit/event/note. A cron job fires them every minute. |
-| **Bin** | Every soft-delete across all features lands here; restore or permanently delete; **30-day auto-purge** via a midnight cron. |
-| **Settings** | Per-profile timezone, theme (light/dark/system), and week start (Sunday/Monday). |
-| **Dashboard** | Today / tomorrow / next-7-days / overdue summary of tasks due in your timezone. |
+- **Backend:** Node.js & Express REST API backed by **Supabase (PostgreSQL)**.
+- **Frontend:** Dependency-free vanilla JavaScript (ES Modules) with Bootstrap 5 and a custom Neobrutalist design system.
 
 ---
 
-## Tech stack
-
-- **Backend:** Node.js (CommonJS), Express 4, `jsonwebtoken` + `bcryptjs`, `node-cron`
-- **Database:** Supabase - PostgreSQL (no ORM; direct Supabase JS queries against the schema in [`db/schema.sql`](db/schema.sql))
-- **Frontend:** Vanilla ES-module JS, Bootstrap 5, single shared `app.css`, no build step
-- **Timezone math:** hand-rolled, DST-correct (`Intl.DateTimeFormat` offset sampling) in [`src/utils/profileTime.js`](src/utils/profileTime.js), mirrored client-side in [`frontend/js/timeUtils.js`](frontend/js/timeUtils.js)
-
----
-
-## Project structure
-
-```
-├── db/
-│   ├── schema.sql          # Full Postgres schema (tables, indexes, constraints)
-│   └── schema-erd.svg      # Visual ER diagram
-├── src/
-│   ├── server.js           # Express app, routes, cron jobs
-│   ├── config/             # env.js (validated config), supabase.js (client)
-│   ├── routes/             # One router per resource
-│   ├── controllers/        # Request/response layer
-│   ├── services/           # Business logic (Supabase queries)
-│   ├── middleware/         # requireAuth (JWT bearer)
-│   └── utils/              # jwt, password, refreshToken, profileTime
-├── frontend/
-│   ├── index.html          # Login / signup screen
-│   ├── pages/              # dashboard, tasks, notes, habits, calendar,
-│   │                       # reminders, bin, settings, change-password
-│   ├── js/                 # api.js, auth.js, themeUtils.js, timeUtils.js, …
-│   └── css/app.css
-├── tests/                  # Deterministic stress/regression suite (no runner needed)
-├── api.md                  # Full API reference
-└── package.json
-```
-
-The backend does **not** serve the frontend - the two run independently (see [Running the frontend](#running-the-frontend)).
-
----
-
-## Getting started
+## ⚡ Quick Start: How to Run
 
 ### Prerequisites
+- **Node.js 18+** installed ([Download Node.js](https://nodejs.org/))
+- A free **Supabase** account ([supabase.com](https://supabase.com))
 
-- Node.js **18+** (developed and tested on Node 24)
-- A Supabase project (free tier is fine)
+---
 
-### 1. Install
-
+### Step 1: Install Dependencies
+Open your terminal in the project root folder and run:
 ```bash
 npm install
 ```
 
-### 2. Set up the database
+---
 
-Open your Supabase project → **SQL Editor** → paste and run [`db/schema.sql`](db/schema.sql). That creates every table, index, and constraint. (`db/schema-erd.svg` is a visual of the same schema.)
+### Step 2: Set Up the Database
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) and create or open a project.
+2. Navigate to **SQL Editor** on the left menu.
+3. Open [`db/schema.sql`](db/schema.sql), copy its entire content, paste it into the Supabase SQL editor, and click **Run**.
+   *(This creates all necessary tables, constraints, functions, and indexes.)*
 
-### 3. Configure environment
+---
 
+### Step 3: Configure Environment Variables
+1. Copy the example environment file:
+   - **Windows (PowerShell):**
+     ```powershell
+     Copy-Item .env.example .env
+     ```
+   - **macOS / Linux:**
+     ```bash
+     cp .env.example .env
+     ```
+2. Open `.env` and fill in your values:
+   ```ini
+   PORT=4000
+   NODE_ENV=development
+
+   # From Supabase: Project Settings > API
+   SUPABASE_URL=https://your-project-id.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-secret-key
+
+   # Generate a 64-byte random string for JWT signing
+   JWT_ACCESS_SECRET=your-random-secret-string
+   JWT_ACCESS_EXPIRES_IN=15m
+   JWT_REFRESH_EXPIRES_IN_DAYS=30
+
+   # Local frontend URL for CORS
+   CORS_ORIGIN=http://localhost:5500
+   ```
+
+> 💡 **Tip:** Generate a secure random string for `JWT_ACCESS_SECRET` by running:
+> ```bash
+> node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+> ```
+
+---
+
+### Step 4: Start the Servers
+
+You will need **two terminal tabs/windows**:
+
+#### 🟢 Terminal 1: Run the Backend API
 ```bash
-cp .env.example .env
+npm run dev
 ```
+*The API will start on **`http://localhost:4000`** (Health check: `http://localhost:4000/health`).*
 
-Fill in the values (see the [environment variables](#environment-variables) table). Find your Supabase URL and service-role key in **Supabase → Project Settings → API**.
-
-> ⚠️ The service-role key bypasses Row-Level Security - keep it out of any client-side code. The API uses it because auth + RLS is delegated to the server layer.
-
-### 4. Run the backend
-
+#### 🔵 Terminal 2: Serve the Frontend
+Serve the static `frontend/` directory on port **5500** (matches `CORS_ORIGIN`):
 ```bash
-npm run dev          # node --watch, auto-restarts on change
-# or
-npm start            # plain start
-```
-
-The API listens on `http://localhost:4000` (override with `PORT`). Health check: `GET /health`.
-
-### 5. Run the frontend
-
-The frontend is static - serve the `frontend/` directory with any static server on port **5500** (matches the default `CORS_ORIGIN`):
-
-```bash
-# from the project root
 npx serve frontend -l 5500
-# or VS Code "Live Server", or: cd frontend && python -m http.server 5500
+```
+*Alternative options:*
+- **Python:** `python -m http.server 5500 --directory frontend`
+- **VS Code:** Right-click `frontend/index.html` → "Open with Live Server" (set port to 5500).
+
+---
+
+### Step 5: Open the Application
+Navigate to 👉 **`http://localhost:5500`** in your browser to sign up and begin using Second Brain!
+
+---
+
+## ✨ Features & Architecture
+
+| Feature | Description |
+|---|---|
+| **Auth & Profiles** | Email/password authentication, refresh-token rotation, password changes. Up to **5 isolated profiles** per account (Netflix-style). |
+| **Tasks (Eisenhower Matrix)** | 4-quadrant prioritization (*Do First*, *Schedule*, *Delegate*, *Eliminate*), task due dates, and completion status. |
+| **Notes & Task Conversion** | Capture notes with tags and convert notes directly into tasks with automatic back-linking. |
+| **Habits & Streaks** | Weekly-quota habits with live streak calculation computed directly from habit completion logs (capped at 52 weeks). |
+| **Unified Calendar** | Day/week/month views combining tasks with due dates, habit checks, and standalone calendar events with DST-safe timezone handling. |
+| **Reminders** | Standalone or linked reminders processed every minute by an internal cron job. |
+| **Recycle Bin** | Centralized soft-delete recovery across all modules with a 30-day automated purge cron. |
+| **Neobrutalism UI** | High-contrast solid borders, crisp hard drop shadows, tactile button mechanics, and responsive layouts. |
+
+---
+
+## 📁 Project Structure
+
+```
+├── db/
+│   ├── schema.sql          # Postgres database schema (tables, constraints, indexes)
+│   └── schema-erd.svg      # Entity-Relationship diagram
+├── src/
+│   ├── server.js           # Express app setup, routing, and background cron jobs
+│   ├── config/             # Environment validation and Supabase client
+│   ├── routes/             # REST API routes (auth, tasks, notes, habits, etc.)
+│   ├── controllers/        # Request handling and response validation
+│   ├── services/           # Database queries and business logic
+│   ├── middleware/         # JWT authentication guard and rate limiters
+│   └── utils/              # Token generation, password hashing, and timezone math
+├── frontend/
+│   ├── index.html          # Login and signup portal
+│   ├── pages/              # dashboard, tasks, notes, habits, calendar, reminders, bin, settings
+│   ├── js/                 # API client, auth flow, layout manager, and timezone utilities
+│   └── css/app.css         # Neobrutalism design system and responsive styles
+├── tests/                  # Deterministic stress & regression suite (in-memory mock)
+├── api.md                  # Comprehensive API documentation
+└── package.json
 ```
 
-Open `http://localhost:5500`, sign up, and log in.
-
-> The frontend's API base URL is hard-coded to `http://localhost:4000/api` in [`frontend/js/api.js`](frontend/js/api.js) - change it for any non-local backend.
-
 ---
 
-## Environment variables
+## 🧪 Testing
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `PORT` | no | `4000` | API port |
-| `NODE_ENV` | no | `development` | `development` / `production` |
-| `SUPABASE_URL` | **yes** | - | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | **yes** | - | Supabase service-role key (server only) |
-| `JWT_ACCESS_SECRET` | **yes** | - | Secret for signing access tokens. Generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
-| `JWT_ACCESS_EXPIRES_IN` | no | `15m` | Access-token lifetime (any `jsonwebtoken` expiresIn string) |
-| `JWT_REFRESH_EXPIRES_IN_DAYS` | no | `30` | Refresh-token lifetime in days |
-| `CORS_ORIGIN` | no | `http://localhost:5500` | Allowed browser origin (set to your Netlify URL in prod) |
+The repository includes a deterministic regression and stress-testing suite that runs against an **in-memory Supabase mock** ([`tests/mockSupabase.js`](tests/mockSupabase.js)). **No live database connection is required to run tests.**
 
----
-
-## Testing
-
-No test runner is installed. The suite in [`tests/`](tests/) is plain Node scripts with a tiny assertion framework, and it runs against an **in-memory Supabase mock** ([`tests/mockSupabase.js`](tests/mockSupabase.js)) injected via `require.cache` - the *real* services and controllers execute unchanged, so **no database is needed**. All randomness is seeded and time is injectable, so runs are deterministic and reproducible.
-
+Run individual tests:
 ```bash
-node tests/stress-time.js        # 19 assertions - 2 years × 4 timezones of DST-correct
-                                 #   day/week bounds, local midnights, range spans
-node tests/stress-habits.js      # 247 assertions - streak math vs an independent
-                                 #   spec reference (~2,300 randomized patterns),
-                                 #   52-week cap, missed-week resets
-node tests/stress-controllers.js # 64 assertions - a full simulated year driven through
-                                 #   the real controllers: habits, dashboard ranges,
-                                 #   calendar, reminders cron, bin purge, note conversion,
-                                 #   profile isolation, settings changes
-node tests/frontend-dst.js       # 146 assertions - the real frontend timeUtils.js vs the
-                                 #   backend on DST days, weeks, and months
+node tests/stress-time.js        # DST-correct bounds over 2 years & multiple timezones
+node tests/stress-habits.js      # Streak math vs spec reference across randomized patterns
+node tests/stress-controllers.js # Full simulated year through controllers
+node tests/frontend-dst.js       # Frontend timezone parity checks
 ```
 
-Run them all:
-
+Run all tests together:
 ```bash
-for f in tests/*.js; do node "$f"; done
+node tests/stress-time.js ; node tests/stress-habits.js ; node tests/stress-controllers.js ; node tests/frontend-dst.js
 ```
 
-**476 assertions, 0 failures** is the expected green state.
+---
 
-> The mock mirrors Postgres semantics the code relies on (row defaults, unique-constraint `23505`, filter operators, `habits(...)` join) but is **not** Postgres - type-coercion behaviors (e.g. rejecting a non-date string) only show up against a real database.
+## 🚀 Deployment
+
+- **Backend (Render / Railway / VPS):**
+  1. Create a new Node.js Web Service pointing to this repository.
+  2. Set the environment variables in your hosting dashboard.
+  3. Start command: `npm start`.
+  4. Set `CORS_ORIGIN` to your frontend production URL.
+
+- **Frontend (Netlify / Vercel / Cloudflare Pages):**
+  1. Publish directory: `frontend/` (no build step needed).
+  2. In [`frontend/js/api.js`](frontend/js/api.js), set `API_BASE_URL` to your live backend URL (e.g. `https://your-backend.onrender.com/api`).
 
 ---
 
-## Deployment
+## 📖 API Documentation
 
-The repo is designed for **backend on Render** + **frontend on Netlify**.
-
-**Backend (Render):**
-1. Create a new Web Service pointing at this repo.
-2. Set the environment variables (the same names as [above](#environment-variables)) in the Render dashboard - **no `.env` file on Render**.
-3. Start command: `npm start`. `CORS_ORIGIN` = your Netlify URL.
-
-**Frontend (Netlify):**
-1. Build command: *none* (static site), publish directory: `frontend/`.
-2. Update [`frontend/js/api.js`](frontend/js/api.js) `API_BASE_URL` to your Render URL.
-
----
-
-## API
-
-Full endpoint reference (auth, profiles, tasks, notes, habits, calendar, reminders, bin, settings, dashboard) lives in **[`api.md`](api.md)**.
-
-All routes except `/api/auth/*` and `/health` require an `Authorization: Bearer <accessToken>` header.
-
----
-
-## Known limitations & follow-ups
-
-From a year-long stress-test audit (see [Testing](#testing)); none are crashes, but worth knowing:
-
-- **No pagination** on list endpoints - tasks/notes/reminders/bin return everything (and done reminders accumulate). Fine at personal scale, slow at scale.
-- **`datetime-local` inputs** (tasks, reminders, calendar pages) capture *browser-local* wall time, while the backend interprets streaks and dashboard ranges in the *profile's* configured timezone. Set the two the same, or due/reminder times will be interpreted in the wrong zone.
-- **Habit streaks cap at 52 weeks** - a 100-week perfect streak reports 52 (the query window is deliberately bounded).
-- **Validation gaps** documented in the stress suite: an event `UPDATE` can set `ends_at < starts_at` (create validates, update doesn't), and habit-log dates aren't validated for format/future dates.
-- **`refresh_tokens` rows are never purged** - expired/revoked rows accumulate (harmless at single-user scale; a cleanup cron would be a reasonable addition).
+For the complete REST API specification, headers, request bodies, and responses, see **[`api.md`](api.md)**.

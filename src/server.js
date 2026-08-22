@@ -13,6 +13,7 @@ const habitRoutes = require('./routes/habitRoutes');
 const calendarEventRoutes = require('./routes/calendarEventRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 const { fireReminders } = require('./services/reminderService');
 const { purgeExpiredEntries } = require('./controllers/binController');
 
@@ -56,6 +57,7 @@ app.use('/api/habits', habitRoutes);
 app.use('/api/calendar-events', calendarEventRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ai', aiRoutes);
 
 cron.schedule('* * * * *', async () => {
   try {

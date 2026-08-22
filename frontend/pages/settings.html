@@ -26,6 +26,7 @@
 
         <div class="settings-card">
             <form id="settingsForm">
+                <div class="dash-section-title">General Preferences</div>
                 <div class="mb-3">
                     <label class="form-label" for="timezoneSelect">Timezone</label>
                     <select class="form-select" id="timezoneSelect"></select>
@@ -37,8 +38,86 @@
                         <option value="1">Monday</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save Preferences</button>
                 <div class="settings-save-msg" id="saveMsg">Saved.</div>
+            </form>
+        </div>
+
+        <!-- AI Assistant & LLM Provider Settings Card -->
+        <div class="settings-card" id="aiSettingsCard">
+            <div class="dash-section-title d-flex align-items-center gap-2">
+                <span>🧠 AI Assistant &amp; LLM Provider</span>
+                <span class="ai-beta-tag">BETA</span>
+            </div>
+            <p class="form-text mb-3">Configure your preferred AI provider to power the Second Brain AI Assistant overlay. Select a provider, choose your model from the categorized list, and provide your API key.</p>
+
+            <form id="aiProviderSettingsForm">
+                <div class="mb-3">
+                    <label class="form-label" for="settingsAiProvider">1. LLM Provider</label>
+                    <select id="settingsAiProvider" class="form-select">
+                        <option value="" disabled selected>-- Select a Provider --</option>
+                        <option value="gemini">Google Gemini</option>
+                        <option value="claude">Anthropic Claude</option>
+                        <option value="grok">xAI (Grok)</option>
+                        <option value="groq">Groq (Ultra-Fast LPU)</option>
+                        <option value="custom">Custom Endpoint</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="settingsAiEndpoint">Base Endpoint URL</label>
+                    <input type="url" id="settingsAiEndpoint" class="form-control" placeholder="https://generativelanguage.googleapis.com/v1beta/openai" />
+                    <div class="form-text" id="settingsAiEndpointHint">Standard base endpoint for this provider.</div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="settingsAiAuthType">Auth Header Type</label>
+                        <select id="settingsAiAuthType" class="form-select">
+                            <option value="bearer">Bearer Token (Authorization: Bearer ...)</option>
+                            <option value="api-key">API Key Header (x-api-key)</option>
+                            <option value="none">None (No Auth / Local)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="settingsAiApiKey">API Key / Token</label>
+                        <div class="input-group">
+                            <input type="password" id="settingsAiApiKey" class="form-control" placeholder="Enter API key" autocomplete="off" />
+                            <button type="button" class="btn btn-outline-secondary" id="settingsAiToggleKey">Show</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label mb-0" for="settingsAiModelSelect">2. Model (Live from Endpoint)</label>
+                        <button type="button" id="settingsFetchModelsBtn" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.75rem;">
+                            🔄 Fetch Live Models
+                        </button>
+                    </div>
+                    <select id="settingsAiModelSelect" class="form-select" required>
+                        <option value="" disabled selected>-- Click "Fetch Live Models" or Select Provider First --</option>
+                    </select>
+                    <div id="settingsAiModelStatus" class="form-text mt-1 text-muted" style="font-size: 0.76rem;"></div>
+                    <div id="settingsCustomModelWrap" class="mt-2 d-none">
+                        <input type="text" id="settingsCustomModelInput" class="form-control" placeholder="Enter custom model identifier (e.g. llama-3.2-3b)" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingsAiContext" checked />
+                        <label class="form-check-label" for="settingsAiContext">
+                            <strong>Attach Second Brain Live Context</strong> (Tasks, habits, notes, calendar)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-primary btn-sm">💾 Save AI Settings</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="settingsAiTestBtn">🔌 Test Connection</button>
+                </div>
+                <div id="settingsAiStatusMsg" class="ai-test-status mt-2"></div>
             </form>
         </div>
 

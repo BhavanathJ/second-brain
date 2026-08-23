@@ -26,12 +26,15 @@ erDiagram
   USERS {
     uuid id PK
     text email
+    text username
     text password_hash
+    timestamptz created_at
   }
   PROFILES {
     uuid id PK
     uuid user_id FK
     text name
+    timestamptz created_at
   }
   REFRESH_TOKENS {
     uuid id PK
@@ -40,28 +43,37 @@ erDiagram
     text token_hash
     timestamptz expires_at
     timestamptz revoked_at
+    timestamptz created_at
   }
   SETTINGS {
-    uuid profile_id PK_FK
+    uuid profile_id PK
     text timezone
+    text theme
     smallint week_starts_on
+    timestamptz updated_at
   }
   TASKS {
     uuid id PK
     uuid profile_id FK
     text title
+    text description
+    text status
     boolean urgent
     boolean important
     timestamptz due_at
     timestamptz deleted_at
+    timestamptz created_at
+    timestamptz updated_at
   }
   NOTES {
     uuid id PK
     uuid profile_id FK
     text content
-    text_array tags
+    text tags
     uuid converted_task_id FK
     timestamptz deleted_at
+    timestamptz created_at
+    timestamptz updated_at
   }
   HABITS {
     uuid id PK
@@ -69,6 +81,7 @@ erDiagram
     text title
     smallint target_per_week
     timestamptz deleted_at
+    timestamptz created_at
   }
   HABIT_LOGS {
     uuid id PK
@@ -76,6 +89,7 @@ erDiagram
     uuid profile_id FK
     date log_date
     boolean completed
+    timestamptz created_at
   }
   CALENDAR_EVENTS {
     uuid id PK
@@ -83,7 +97,9 @@ erDiagram
     text title
     timestamptz starts_at
     timestamptz ends_at
+    text location
     timestamptz deleted_at
+    timestamptz created_at
   }
   REMINDERS {
     uuid id PK
@@ -92,7 +108,9 @@ erDiagram
     timestamptz remind_at
     text entity_type
     uuid entity_id
+    boolean is_done
     timestamptz deleted_at
+    timestamptz created_at
   }
   BIN_ENTRIES {
     uuid id PK

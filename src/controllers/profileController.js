@@ -1,6 +1,7 @@
 const profileService = require('../services/profileService');
 const settingsService = require('../services/settingsService');
 const { issueTokenPair } = require('./authController');
+const authService = require('../services/authService');
 
 async function listProfiles(req, res) {
     try {
@@ -47,7 +48,8 @@ async function selectProfile(req, res) {
             return res.status(404).json({ error: 'Profile not found.' });
         }
 
-        const tokens = await issueTokenPair({ userId: req.userId, profileId: profile.id });
+        const user = await authService.findUserById(req.userId);
+        const tokens = await issueTokenPair({ userId: req.userId, profileId: profile.id, username: user.username });
 
         return res.status(200).json({ profile, ...tokens });
     } catch (err) {

@@ -232,6 +232,13 @@ a:hover {
     font-size: 0.78rem;
 }
 
+.nav-username {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--sb-muted);
+    white-space: nowrap;
+}
+
 /* Navbar toggler (hamburger menu) styles for mobile */
 .navbar-toggler {
     border: 1px solid var(--sb-border);

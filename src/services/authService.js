@@ -11,6 +11,17 @@ async function findUserByEmail(email) {
     return data;
 }
 
+async function findUserByUsername(username) {
+    const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('username', username)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 async function findUserById(userId) {
     const { data, error } = await supabase
         .from('users')
@@ -22,10 +33,10 @@ async function findUserById(userId) {
     return data;
 }
 
-async function createUser({ email, passwordHash }) {
+async function createUser({ email, username, passwordHash }) {
     const { data, error } = await supabase
         .from('users')
-        .insert({ email, password_hash: passwordHash })
+        .insert({ email, username, password_hash: passwordHash })
         .select()
         .single();
 
@@ -123,6 +134,7 @@ async function revokeAllRefreshTokensForUser(userId) {
 
 module.exports = {
     findUserByEmail,
+    findUserByUsername,
     findUserById,
     createUser,
     updatePassword,

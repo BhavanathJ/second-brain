@@ -1,4 +1,5 @@
 const express = require('express');
+
 const cors = require('cors');
 const cron = require('node-cron');
 const config = require('./config/env');
@@ -28,9 +29,20 @@ const allowedOrigins = Array.isArray(config.corsOrigin)
     ? config.corsOrigin
     : [config.corsOrigin];
 
-app.use(cors({
+app.use(express.json());
+
+// Serve static files first - no CORS needed for same-origin requests
+app.use(express.static('frontend'));
+
+// Apply CORS globally for API routes - since we serve frontend from same origin,
+// CORS is mainly needed for cross-origin requests during development
+app.use('/api', cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Allow requests with no origin (same-origin requests, file://, etc.)
+        // and requests from allowed origins
+        // Also allow localhost:4000 explicitly for same-origin API calls
+        console.log('[CORS] Origin:', origin);
+        if (!origin || allowedOrigins.includes(origin) || origin === 'http://localhost:4000') {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -38,12 +50,9 @@ app.use(cors({
     },
     credentials: true
 }));
-app.use(express.json());
 
 const { globalApiLimiter } = require('./middleware/rateLimiters');
 app.use('/api', globalApiLimiter);
-
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profiles', profileRoutes);
@@ -56,6 +65,8 @@ app.use('/api/habits', habitRoutes);
 app.use('/api/calendar-events', calendarEventRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 cron.schedule('* * * * *', async () => {
   try {

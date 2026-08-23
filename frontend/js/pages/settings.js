@@ -7,6 +7,7 @@ let renameProfileModal = null;
 let deleteProfileModal = null;
 let profileToRenameId = null;
 let profileToDeleteId = null;
+let profileToDeleteName = null;
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -118,13 +119,16 @@ function handleRenameClick(e) {
 function handleDeleteClick(e) {
     const btn = e.currentTarget;
     profileToDeleteId = btn.dataset.profileId;
-    const currentName = btn.dataset.profileName;
+    profileToDeleteName = btn.dataset.profileName;
 
     if (!deleteProfileModal) {
         deleteProfileModal = new bootstrap.Modal(document.getElementById('deleteProfileModal'));
     }
 
-    document.getElementById('deleteProfileName').textContent = currentName;
+    document.getElementById('deleteProfileName').textContent = profileToDeleteName;
+    // Clear any leftover text from a previous attempt on a different
+    // profile — otherwise a stale correct answer could sit in the box.
+    document.getElementById('deleteConfirmInput').value = '';
     deleteProfileModal.show();
 }
 
@@ -151,6 +155,15 @@ async function handleRenameConfirm() {
 
 async function handleDeleteConfirm() {
     if (!profileToDeleteId) return;
+
+    // The actual safeguard — this is what the "type to confirm" box was
+    // supposed to do from the start. Exact, case-sensitive match, same
+    // pattern GitHub uses for "type the repo name to confirm deletion".
+    const typedName = document.getElementById('deleteConfirmInput').value;
+    if (typedName !== profileToDeleteName) {
+        showToast('Profile name does not match. Deletion cancelled.');
+        return;
+    }
 
     try {
         await apiFetch(`/profiles/${profileToDeleteId}`, { method: 'DELETE' });

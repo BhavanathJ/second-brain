@@ -80,6 +80,7 @@ signupForm.addEventListener('submit', async (e) => {
     const errorEl = document.getElementById('signupError');
     errorEl.classList.remove('visible');
 
+    const username = document.getElementById('signupUsername').value.trim();
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('signupConfirmPassword').value;
@@ -92,7 +93,7 @@ signupForm.addEventListener('submit', async (e) => {
     try {
         const data = await apiFetch('/auth/signup', {
             method: 'POST',
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ username, email, password }),
         });
         handleAuthSuccess(data);
     } catch (err) {

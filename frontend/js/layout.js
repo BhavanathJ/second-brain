@@ -1,6 +1,7 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
 import { resolveTheme, watchSystemTheme } from './themeUtils.js';
+import { escapeHtml } from './utils.js';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'dashboard.html', page: 'dashboard' },
@@ -52,7 +53,7 @@ function renderNavHTML(activePage, username) {
         <div class="collapse navbar-collapse" id="appNavCollapse">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">${links}</ul>
           <div class="d-flex align-items-center gap-2 nav-controls">
-            ${username ? `<span class="nav-username">Hi, ${username}</span>` : ''}
+            ${username ? `<span class="nav-username">Hi, ${escapeHtml(username)}</span>` : ''}
             <select id="profileSwitcher" class="form-select form-select-sm app-profile-select" aria-label="Active profile"></select>
             <select id="themeSelect" class="form-select form-select-sm app-theme-select" aria-label="Theme" title="Theme">
               <option value="light">☀️ Light</option>

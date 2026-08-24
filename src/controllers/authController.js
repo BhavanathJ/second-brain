@@ -84,6 +84,10 @@ async function login(req, res) {
     }
 
     const profile = await authService.findDefaultProfileForUser(user.id);
+    if (!profile) {
+      console.error(`Login integrity error: user ${user.id} has no profile.`);
+      return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
 
     const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id, username: user.username });
 
@@ -142,7 +146,14 @@ async function logout(req, res) {
 
   try {
     const tokenHash = hashRefreshToken(rawRefreshToken);
-    await authService.revokeRefreshToken(tokenHash);
+    const existingToken = await authService.findActiveRefreshToken(tokenHash);
+
+    // Only revoke if this token belongs to the authenticated caller — stops
+    // one user force-logging-out another user with a stolen/guessed token.
+    if (existingToken && existingToken.user_id === req.userId) {
+      await authService.revokeRefreshToken(tokenHash);
+    }
+
     return res.status(204).send();
   } catch (err) {
     console.error('Logout error:', err);

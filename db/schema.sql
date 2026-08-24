@@ -32,6 +32,7 @@ CREATE TABLE profiles (
 );
 
 CREATE INDEX idx_profiles_user ON profiles (user_id);
+CREATE UNIQUE INDEX profiles_user_name_unique_idx ON profiles (user_id, LOWER(name));
 
 -- One row per logged-in device/session. Never store the raw token.
 CREATE TABLE refresh_tokens (

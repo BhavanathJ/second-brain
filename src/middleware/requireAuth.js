@@ -13,6 +13,7 @@ function requireAuth(req, res, next) {
     const payload = verifyAccessToken(token);
     req.userId = payload.sub;
     req.profileId = payload.profile_id;
+    req.username = payload.username;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired access token.' });

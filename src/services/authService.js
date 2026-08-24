@@ -15,7 +15,7 @@ async function findUserByUsername(username) {
     const { data, error } = await supabase
         .from('users')
         .select('*')
-        .ilike('username', username)
+        .eq('username', username.toLowerCase())
         .maybeSingle();
 
     if (error) throw error;

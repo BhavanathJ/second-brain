@@ -31,18 +31,11 @@ const allowedOrigins = Array.isArray(config.corsOrigin)
 
 app.use(express.json());
 
-// Serve static files first - no CORS needed for same-origin requests
-app.use(express.static('frontend'));
-
-// Apply CORS globally for API routes - since we serve frontend from same origin,
-// CORS is mainly needed for cross-origin requests during development
 app.use('/api', cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (same-origin requests, file://, etc.)
         // and requests from allowed origins
-        // Also allow localhost:4000 explicitly for same-origin API calls
-        console.log('[CORS] Origin:', origin);
-        if (!origin || allowedOrigins.includes(origin) || origin === 'http://localhost:4000') {
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));

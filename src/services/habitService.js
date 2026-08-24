@@ -83,11 +83,12 @@ async function restoreHabit(profileId, habitId) {
 }
 
 async function hardDeleteHabit(profileId, habitId) {
-    await supabase
+    const { error: logsError } = await supabase
         .from('habit_logs')
         .delete()
         .eq('habit_id', habitId)
         .eq('profile_id', profileId);
+    if (logsError) throw logsError;
 
     const { error } = await supabase
         .from('habits')

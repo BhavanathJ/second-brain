@@ -1,4 +1,5 @@
 const express = require('express');
+
 const cors = require('cors');
 const cron = require('node-cron');
 const config = require('./config/env');
@@ -28,8 +29,12 @@ const allowedOrigins = Array.isArray(config.corsOrigin)
     ? config.corsOrigin
     : [config.corsOrigin];
 
-app.use(cors({
+app.use(express.json());
+
+app.use('/api', cors({
     origin: (origin, callback) => {
+        // Allow requests with no origin (same-origin requests, file://, etc.)
+        // and requests from allowed origins
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -38,12 +43,9 @@ app.use(cors({
     },
     credentials: true
 }));
-app.use(express.json());
 
 const { globalApiLimiter } = require('./middleware/rateLimiters');
 app.use('/api', globalApiLimiter);
-
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profiles', profileRoutes);
@@ -56,6 +58,8 @@ app.use('/api/habits', habitRoutes);
 app.use('/api/calendar-events', calendarEventRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 cron.schedule('* * * * *', async () => {
   try {

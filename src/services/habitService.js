@@ -44,7 +44,7 @@ async function createHabit(profileId, { title, target_per_week }) {
 async function updateHabit(profileId, habitId, fields) {
     const { data, error } = await supabase
         .from('habits')
-        .update({ ...fields })
+        .update({ ...fields, updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', habitId)
         .is('deleted_at', null)
@@ -58,7 +58,7 @@ async function updateHabit(profileId, habitId, fields) {
 async function softDeleteHabit(profileId, habitId) {
     const { data, error } = await supabase
         .from('habits')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', habitId)
         .is('deleted_at', null)
@@ -72,7 +72,7 @@ async function softDeleteHabit(profileId, habitId) {
 async function restoreHabit(profileId, habitId) {
     const { data, error } = await supabase
         .from('habits')
-        .update({ deleted_at: null })
+        .update({ deleted_at: null, updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', habitId)
         .select()
@@ -83,11 +83,12 @@ async function restoreHabit(profileId, habitId) {
 }
 
 async function hardDeleteHabit(profileId, habitId) {
-    await supabase
+    const { error: logsError } = await supabase
         .from('habit_logs')
         .delete()
         .eq('habit_id', habitId)
         .eq('profile_id', profileId);
+    if (logsError) throw logsError;
 
     const { error } = await supabase
         .from('habits')

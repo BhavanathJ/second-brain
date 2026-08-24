@@ -23,7 +23,7 @@ const config = {
     refreshExpiresInDays: Number(process.env.JWT_REFRESH_EXPIRES_IN_DAYS || 30),
   },
 
-  corsOrigin: (process.env.CORS_ORIGIN || 'http://localhost:5500,http://localhost:3000').split(','),
+  corsOrigin: (process.env.CORS_ORIGIN || 'http://localhost:5500,http://localhost:3000,http://localhost:4000').split(','),
 };
 
 module.exports = config;

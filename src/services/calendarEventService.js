@@ -48,7 +48,7 @@ async function createCalendarEvent(profileId, { title, starts_at, ends_at, locat
 async function updateCalendarEvent(profileId, eventId, fields) {
     const { data, error } = await supabase
         .from('calendar_events')
-        .update({ ...fields })
+        .update({ ...fields, updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', eventId)
         .is('deleted_at', null)
@@ -62,7 +62,7 @@ async function updateCalendarEvent(profileId, eventId, fields) {
 async function softDeleteCalendarEvent(profileId, eventId) {
     const { data, error } = await supabase
         .from('calendar_events')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', eventId)
         .is('deleted_at', null)
@@ -76,7 +76,7 @@ async function softDeleteCalendarEvent(profileId, eventId) {
 async function restoreCalendarEvent(profileId, eventId) {
     const { data, error } = await supabase
         .from('calendar_events')
-        .update({ deleted_at: null })
+        .update({ deleted_at: null, updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', eventId)
         .select()

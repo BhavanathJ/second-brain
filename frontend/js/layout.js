@@ -1,6 +1,7 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
 import { resolveTheme, watchSystemTheme } from './themeUtils.js';
+import { escapeHtml } from './utils.js';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'dashboard.html', page: 'dashboard' },
@@ -35,7 +36,7 @@ function requireAuthGuard() {
     return true;
 }
 
-function renderNavHTML(activePage) {
+function renderNavHTML(activePage, username) {
     const links = NAV_ITEMS.map(item => `
     <li class="nav-item">
       <a class="nav-link${item.page === activePage ? ' active' : ''}" href="${item.href}">${item.label}</a>
@@ -52,6 +53,7 @@ function renderNavHTML(activePage) {
         <div class="collapse navbar-collapse" id="appNavCollapse">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">${links}</ul>
           <div class="d-flex align-items-center gap-2 nav-controls">
+            ${username ? `<span class="nav-username">Hi, ${escapeHtml(username)}</span>` : ''}
             <select id="profileSwitcher" class="form-select form-select-sm app-profile-select" aria-label="Active profile"></select>
             <select id="themeSelect" class="form-select form-select-sm app-theme-select" aria-label="Theme" title="Theme">
               <option value="light">☀️ Light</option>
@@ -165,13 +167,14 @@ export async function initLayout(activePage) {
 
     const payload = decodeAccessToken();
     const profileId = payload?.profile_id ?? null;
+    const username = payload?.username ?? null;
 
     const mount = document.getElementById('app-nav');
     if (!mount) {
         console.error('layout.js: no #app-nav element found on this page.');
         return null;
     }
-    mount.innerHTML = renderNavHTML(activePage);
+    mount.innerHTML = renderNavHTML(activePage, username);
 
     await populateProfileSwitcher(profileId);
     await initThemeSelect();

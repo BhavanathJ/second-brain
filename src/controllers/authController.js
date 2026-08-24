@@ -5,8 +5,10 @@ const { signAccessToken, verifyAccessToken } = require('../utils/jwt');
 const { generateRefreshToken, hashRefreshToken } = require('../utils/refreshToken');
 const config = require('../config/env');
 
-async function issueTokenPair({ userId, profileId }) {
-  const accessToken = signAccessToken({ userId, profileId });
+const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+
+async function issueTokenPair({ userId, profileId, username }) {
+  const accessToken = signAccessToken({ userId, profileId, username });
 
   const rawRefreshToken = generateRefreshToken();
   const tokenHash = hashRefreshToken(rawRefreshToken);
@@ -20,36 +22,43 @@ async function issueTokenPair({ userId, profileId }) {
 }
 
 async function signup(req, res) {
-  const { email, password } = req.body;
+  const { email, username, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
+  if (!email || !username || !password) {
+    return res.status(400).json({ error: 'Email, username, and password are required.' });
   }
   if (password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   }
+  if (!USERNAME_REGEX.test(username)) {
+    return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, and underscores only.' });
+  }
 
   try {
-    const existing = await authService.findUserByEmail(email);
-    if (existing) {
+    const existingEmail = await authService.findUserByEmail(email);
+    if (existingEmail) {
       return res.status(409).json({ error: 'An account with this email already exists.' });
+    }
+    const existingUsername = await authService.findUserByUsername(username);
+    if (existingUsername) {
+      return res.status(409).json({ error: 'This username is already taken.' });
     }
 
     const passwordHash = await hashPassword(password);
-    const user = await authService.createUser({ email, passwordHash });
+    const user = await authService.createUser({ email, username, passwordHash });
     const profile = await authService.createDefaultProfile(user.id);
     await settingsService.createDefaultSettings(profile.id);
 
-    const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id });
+    const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id, username: user.username });
 
     return res.status(201).json({
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, email: user.email, username: user.username },
       profile: { id: profile.id, name: profile.name },
       ...tokens,
     });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ error: 'An account with this email already exists.' });
+      return res.status(409).json({ error: 'That email or username is already taken.' });
     }
     console.error('Signup error:', err);
     return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -75,11 +84,15 @@ async function login(req, res) {
     }
 
     const profile = await authService.findDefaultProfileForUser(user.id);
+    if (!profile) {
+      console.error(`Login integrity error: user ${user.id} has no profile.`);
+      return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
 
-    const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id });
+    const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id, username: user.username });
 
     return res.status(200).json({
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, email: user.email, username: user.username },
       profile: { id: profile.id, name: profile.name },
       ...tokens,
     });
@@ -106,9 +119,15 @@ async function refresh(req, res) {
 
     await authService.revokeRefreshToken(tokenHash);
 
+    // refresh_tokens doesn't store username — look it up fresh so the
+    // new access token always reflects the CURRENT username, not a
+    // stale copy (relevant if a future "change username" feature ships).
+    const user = await authService.findUserById(existingToken.user_id);
+
     const tokens = await issueTokenPair({
       userId: existingToken.user_id,
       profileId: existingToken.profile_id,
+      username: user.username,
     });
 
     return res.status(200).json(tokens);
@@ -127,7 +146,14 @@ async function logout(req, res) {
 
   try {
     const tokenHash = hashRefreshToken(rawRefreshToken);
-    await authService.revokeRefreshToken(tokenHash);
+    const existingToken = await authService.findActiveRefreshToken(tokenHash);
+
+    // Only revoke if this token belongs to the authenticated caller — stops
+    // one user force-logging-out another user with a stolen/guessed token.
+    if (existingToken && existingToken.user_id === req.userId) {
+      await authService.revokeRefreshToken(tokenHash);
+    }
+
     return res.status(204).send();
   } catch (err) {
     console.error('Logout error:', err);
@@ -135,15 +161,6 @@ async function logout(req, res) {
   }
 }
 
-// Changes the logged-in user's password. Requires the CURRENT password
-// (not just a valid session) — prevents someone who's grabbed an
-// unlocked, logged-in browser from locking the real owner out by
-// silently changing the password with no proof of knowing the old one.
-//
-// On success, revokes every refresh token for this user (all devices,
-// all profiles) — see revokeAllRefreshTokensForUser for why. The
-// current request's own tokens are NOT reissued here; the frontend
-// must log the user back in with the new password.
 async function changePassword(req, res) {
   const { currentPassword, newPassword } = req.body;
 

@@ -9,5 +9,7 @@ router.use(requireAuth);
 router.get('/', profileController.listProfiles);
 router.post('/', profileController.createProfile);
 router.post('/:id/select', profileController.selectProfile);
+router.patch('/:id', profileController.renameProfile);
+router.delete('/:id', profileController.deleteProfile);
 
 module.exports = router;

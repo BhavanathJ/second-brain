@@ -48,7 +48,7 @@ async function createReminder(profileId, { title, remind_at, entity_type, entity
 async function updateReminder(profileId, reminderId, fields) {
     const { data, error } = await supabase
         .from('reminders')
-        .update({ ...fields })
+        .update({ ...fields, updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', reminderId)
         .is('deleted_at', null)
@@ -62,7 +62,7 @@ async function updateReminder(profileId, reminderId, fields) {
 async function softDeleteReminder(profileId, reminderId) {
     const { data, error } = await supabase
         .from('reminders')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', reminderId)
         .is('deleted_at', null)
@@ -73,10 +73,12 @@ async function softDeleteReminder(profileId, reminderId) {
     return data;
 }
 
+// restore also resets is_done — an un-deleted reminder shouldn't come
+// back permanently "fired" and invisible to the default is_done=false view.
 async function restoreReminder(profileId, reminderId) {
     const { data, error } = await supabase
         .from('reminders')
-        .update({ deleted_at: null })
+        .update({ deleted_at: null, is_done: false, updated_at: new Date().toISOString() })
         .eq('profile_id', profileId)
         .eq('id', reminderId)
         .select()
@@ -100,7 +102,7 @@ async function hardDeleteReminder(profileId, reminderId) {
 async function fireReminders() {
     const { data, error } = await supabase
         .from('reminders')
-        .update({ is_done: true })
+        .update({ is_done: true, updated_at: new Date().toISOString() })
         .lte('remind_at', new Date().toISOString())
         .eq('is_done', false)
         .is('deleted_at', null)

@@ -116,7 +116,8 @@ CREATE TABLE habits (
   title TEXT NOT NULL,
   target_per_week SMALLINT NOT NULL DEFAULT 7, -- 7 = daily, else e.g. 3 = "3x/week any days"
   deleted_at TIMESTAMPTZ,        -- soft-delete habit only; habit_logs are NEVER deleted with it
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE habit_logs (
@@ -145,7 +146,8 @@ CREATE TABLE calendar_events (
   ends_at TIMESTAMPTZ,
   location TEXT,
   deleted_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_calendar_profile_active ON calendar_events (profile_id) WHERE deleted_at IS NULL;
@@ -166,7 +168,8 @@ CREATE TABLE reminders (
   entity_id UUID,      -- not a real FK (entity_type decides target table) — app-enforced
   is_done BOOLEAN NOT NULL DEFAULT false,
   deleted_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_reminders_profile_active ON reminders (profile_id) WHERE deleted_at IS NULL;

@@ -44,7 +44,7 @@ function renderNavHTML(activePage, userRole, impersonatedBy, mustResetPassword) 
         <nav class="navbar navbar-expand-lg app-navbar">
           <div class="container-fluid">
             <span class="navbar-brand app-wordmark">
-              <img src="../assets/favicon.svg" class="app-brand-logo" alt="Logo" />
+              <img src="/assets/favicon.svg" class="app-brand-logo" alt="Logo" />
               Second<span>Brain</span>
             </span>
             <div class="d-flex align-items-center gap-2 nav-controls ms-auto">
@@ -78,9 +78,10 @@ function renderNavHTML(activePage, userRole, impersonatedBy, mustResetPassword) 
     <nav class="navbar navbar-expand-lg app-navbar">
       <div class="container-fluid">
         <a class="navbar-brand app-wordmark" href="dashboard.html">
-          <img src="../assets/favicon.svg" class="app-brand-logo" alt="Logo" />
+          <img src="/assets/favicon.svg" class="app-brand-logo" alt="Logo" />
           Second<span>Brain</span>
         </a>
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#appNavCollapse">
           <span class="navbar-toggler-icon"></span>
         </button>

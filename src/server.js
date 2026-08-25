@@ -26,20 +26,24 @@ const app = express();
 // proxy's IP), rate-limiting each other instead of themselves.
 app.set('trust proxy', 1);
 
-const allowedOrigins = Array.isArray(config.corsOrigin)
+const rawOrigins = Array.isArray(config.corsOrigin)
   ? config.corsOrigin
-  : [config.corsOrigin];
+  : (config.corsOrigin ? String(config.corsOrigin).split(',') : ['http://localhost:5500', 'http://localhost:3000', 'http://127.0.0.1:5500']);
+
+const allowedOrigins = rawOrigins.map(o => o.trim()).filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow non-browser requests (no origin), wildcard '*', or strictly configured origins
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
+
+
 app.use(express.json());
 
 const { globalApiLimiter } = require('./middleware/rateLimiters');
@@ -79,9 +83,13 @@ cron.schedule('0 0 * * *', async () => {
 });
 
 app.use((err, req, res, next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS forbidden: Origin not allowed' });
+  }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
+
 
 app.listen(config.port, () => {
   console.log(`Second Brain API running on port ${config.port} (${config.nodeEnv})`);

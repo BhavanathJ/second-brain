@@ -1,0 +1,16 @@
+node_modules/
+.git/
+.gitignore
+.env
+db/*.sqlite*
+db/*.db*
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+.playwright-cli/
+.gemini/
+coverage/
+.nyc_output/

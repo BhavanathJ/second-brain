@@ -1,0 +1,42 @@
+services:
+  # --- Backend API Service (Node.js + SQLite) ---
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: second-brain-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - DB_CLIENT=sqlite
+      - SQLITE_DB_PATH=/app/db/second_brain.sqlite
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-second_brain_super_secret_jwt_access_key_min_64_characters_long_12345}
+      - JWT_ACCESS_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN_DAYS=30
+      - CORS_ORIGIN=http://localhost:5500,http://localhost:3000,http://127.0.0.1:5500
+    volumes:
+      # Persist SQLite database file on host
+      - ./db:/app/db
+    networks:
+      - second-brain-net
+
+  # --- Frontend Web Service (Nginx Static + Reverse Proxy) ---
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: second-brain-frontend
+    restart: unless-stopped
+    ports:
+      - "5500:80"
+    depends_on:
+      - backend
+    networks:
+      - second-brain-net
+
+networks:
+  second-brain-net:
+    driver: bridge

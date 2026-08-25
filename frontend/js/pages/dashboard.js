@@ -1,4 +1,4 @@
-import { initLayout } from '../layout.js';
+import { initLayout, getCachedSettings, fetchSettingsFast } from '../layout.js';
 import { apiFetch } from '../api.js';
 
 // Basic HTML-escaping for any user-supplied text (task titles, note
@@ -8,6 +8,26 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str ?? '';
     return div.innerHTML;
+}
+
+function renderSkeletons(count = 2) {
+    return Array.from({ length: count }, () => `
+        <div class="dash-item sb-skeleton sb-skeleton-card">
+            <div style="flex:1;">
+                <div class="sb-skeleton-line w-80"></div>
+                <div class="sb-skeleton-line w-40"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showLoadingSkeletons() {
+    document.getElementById('todayTasks').innerHTML = renderSkeletons(2);
+    document.getElementById('todayHabits').innerHTML = renderSkeletons(2);
+    document.getElementById('todayReminders').innerHTML = renderSkeletons(2);
+    document.getElementById('todayEvents').innerHTML = renderSkeletons(2);
+    document.getElementById('tomorrowItems').innerHTML = renderSkeletons(2);
+    document.getElementById('next7Items').innerHTML = renderSkeletons(2);
 }
 
 function formatTime(isoString, timeZone) {
@@ -126,9 +146,7 @@ async function unmarkHabitDone(habitId, logDate) {
     await apiFetch(`/habits/${habitId}/logs/${logDate}`, { method: 'DELETE' });
 }
 
-async function loadDashboard(timeZone) {
-    const data = await apiFetch('/dashboard');
-
+function applyDashboardData(data, timeZone) {
     renderOverdue(data.overdue.tasks, timeZone);
 
     document.getElementById('todayTasks').innerHTML = renderTasks(data.today.tasks, timeZone);
@@ -139,14 +157,13 @@ async function loadDashboard(timeZone) {
     renderMixedList('tomorrowItems', data.tomorrow, timeZone);
     renderMixedList('next7Items', data.next_7_days, timeZone);
 
-    // Wire up "Mark done" and "Undo" buttons - re-attached every render
-    // since buttons are recreated each time the dashboard reloads.
+    // Wire up "Mark done" and "Undo" buttons
     document.querySelectorAll('.habit-done-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             btn.disabled = true;
             try {
                 await markHabitDone(btn.dataset.habitId);
-                await loadDashboard(timeZone); // full reload - simplest way to keep counts/streaks in sync
+                await loadDashboard(timeZone);
             } catch (err) {
                 alert('Failed to mark habit done: ' + err.message);
                 btn.disabled = false;
@@ -158,10 +175,6 @@ async function loadDashboard(timeZone) {
         btn.addEventListener('click', async () => {
             btn.disabled = true;
             try {
-                // Uses the exact date string the server returned in
-                // today_date - never computed client-side. If it no
-                // longer matches (e.g. midnight passed since page load),
-                // the DELETE simply finds no matching log and 404s harmlessly.
                 await unmarkHabitDone(btn.dataset.habitId, btn.dataset.logDate);
                 await loadDashboard(timeZone);
             } catch (err) {
@@ -172,20 +185,32 @@ async function loadDashboard(timeZone) {
     });
 }
 
+async function loadDashboard(timeZone) {
+    const data = await apiFetch('/dashboard');
+    applyDashboardData(data, timeZone);
+}
+
 async function main() {
-    const layoutInfo = await initLayout('dashboard');
-    if (!layoutInfo) return; // initLayout already redirected to login
+    // 1. Show skeletons immediately for zero perceived latency
+    showLoadingSkeletons();
 
-    let timeZone = 'UTC';
-    try {
-        const { settings } = await apiFetch('/settings');
-        timeZone = settings.timezone;
-    } catch (err) {
-        console.error('Failed to load settings, defaulting dashboard times to UTC:', err);
-    }
+    // 2. Initialize layout & read cached timezone immediately
+    const layoutPromise = initLayout('dashboard');
+    const cachedSettings = getCachedSettings();
+    let timeZone = cachedSettings.timezone || 'UTC';
 
+    // 3. Parallel fetch dashboard data and fresh settings
     try {
-        await loadDashboard(timeZone);
+        const [layoutInfo, dashboardData, freshSettings] = await Promise.all([
+            layoutPromise,
+            apiFetch('/dashboard'),
+            fetchSettingsFast()
+        ]);
+
+        if (!layoutInfo) return; // redirect occurred
+
+        timeZone = freshSettings?.timezone || timeZone;
+        applyDashboardData(dashboardData, timeZone);
     } catch (err) {
         console.error('Failed to load dashboard:', err);
         document.querySelector('.dashboard-page').innerHTML =

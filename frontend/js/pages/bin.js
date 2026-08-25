@@ -1,4 +1,4 @@
-import { initLayout } from '../layout.js';
+import { initLayout, getCachedSettings, fetchSettingsFast } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
@@ -7,6 +7,22 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str ?? '';
     return div.innerHTML;
+}
+
+function renderSkeletons(count = 3) {
+    return Array.from({ length: count }, () => `
+        <div class="bin-item sb-skeleton sb-skeleton-card">
+            <div style="flex:1;">
+                <div class="sb-skeleton-line w-80"></div>
+                <div class="sb-skeleton-line w-40"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showLoadingSkeletons() {
+    const mount = document.getElementById('binList');
+    if (mount) mount.innerHTML = renderSkeletons(3);
 }
 
 function formatDate(isoString, timeZone) {
@@ -23,7 +39,7 @@ const TYPE_LABELS = {
     calendar_event: 'Event',
 };
 
-let timeZone = 'UTC';
+let timeZone = getCachedSettings().timezone || 'UTC';
 
 function renderBinItem(entry) {
     return `
@@ -61,8 +77,6 @@ function wireEvents() {
                 showToast('Restored', 'success');
                 await loadBin();
             } catch (err) {
-                // A 404 here specifically means the original item was already
-                // hard-deleted elsewhere - the backend guard from earlier.
                 showToast('Failed to restore: ' + err.message);
                 btn.disabled = false;
             }
@@ -85,18 +99,24 @@ function wireEvents() {
 }
 
 async function main() {
-    const layoutInfo = await initLayout('bin');
-    if (!layoutInfo) return;
+    showLoadingSkeletons();
+
+    const layoutPromise = initLayout('bin');
+    const settingsPromise = fetchSettingsFast();
+    const binPromise = loadBin();
 
     try {
-        const { settings } = await apiFetch('/settings');
-        timeZone = settings.timezone;
-    } catch (err) {
-        console.error('Failed to load settings, defaulting bin dates to UTC:', err);
-    }
+        const [layoutInfo, freshSettings] = await Promise.all([
+            layoutPromise,
+            settingsPromise,
+            binPromise
+        ]);
+        if (!layoutInfo) return;
 
-    try {
-        await loadBin();
+        if (freshSettings?.timezone && freshSettings.timezone !== timeZone) {
+            timeZone = freshSettings.timezone;
+            await loadBin();
+        }
     } catch (err) {
         console.error('Failed to load bin:', err);
         document.querySelector('.bin-page').insertAdjacentHTML('beforeend',

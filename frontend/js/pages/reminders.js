@@ -1,4 +1,4 @@
-import { initLayout } from '../layout.js';
+import { initLayout, getCachedSettings, fetchSettingsFast } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
@@ -9,6 +9,24 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+function renderSkeletons(count = 2) {
+    return Array.from({ length: count }, () => `
+        <div class="reminder-item sb-skeleton sb-skeleton-card">
+            <div style="flex:1;">
+                <div class="sb-skeleton-line w-80"></div>
+                <div class="sb-skeleton-line w-40"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showLoadingSkeletons() {
+    const pendingList = document.getElementById('pendingList');
+    const doneList = document.getElementById('doneList');
+    if (pendingList) pendingList.innerHTML = renderSkeletons(2);
+    if (doneList) doneList.innerHTML = renderSkeletons(2);
+}
+
 function formatDateTime(isoString, timeZone) {
     return new Date(isoString).toLocaleString('en-US', {
         timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -17,15 +35,12 @@ function formatDateTime(isoString, timeZone) {
 
 function isoToLocalInput(isoString) {
     if (!isoString) return '';
-    const d = new Date(isoString);
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return isoString.slice(0, 16);
 }
 
-let timeZone = 'UTC';
+let timeZone = getCachedSettings().timezone || 'UTC';
 let allReminders = [];
-const modalEl = document.getElementById('reminderModal');
-const modal = new bootstrap.Modal(modalEl);
+let modal = null;
 
 function renderReminderItem(r) {
     return `
@@ -49,13 +64,20 @@ function render() {
     const pending = allReminders.filter(r => !r.is_done);
     const done = allReminders.filter(r => r.is_done);
 
-    document.getElementById('pendingList').innerHTML = pending.length === 0
-        ? '<div class="dash-empty">Nothing pending.</div>'
-        : pending.map(renderReminderItem).join('');
+    const pendingEl = document.getElementById('pendingList');
+    const doneEl = document.getElementById('doneList');
 
-    document.getElementById('doneList').innerHTML = done.length === 0
-        ? '<div class="dash-empty">Nothing done yet.</div>'
-        : done.map(renderReminderItem).join('');
+    if (pendingEl) {
+        pendingEl.innerHTML = pending.length === 0
+            ? '<div class="dash-empty">Nothing pending.</div>'
+            : pending.map(renderReminderItem).join('');
+    }
+
+    if (doneEl) {
+        doneEl.innerHTML = done.length === 0
+            ? '<div class="dash-empty">Nothing done yet.</div>'
+            : done.map(renderReminderItem).join('');
+    }
 
     wireItemEvents();
 }
@@ -90,11 +112,11 @@ function wireItemEvents() {
 
     document.querySelectorAll('.reminder-delete-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            const ok = await confirmAction('Move this reminder to Bin?');
+            const ok = await confirmAction('Move this reminder to the bin?');
             if (!ok) return;
             try {
                 await apiFetch(`/reminders/${btn.dataset.id}`, { method: 'DELETE' });
-                showToast('Reminder moved to Bin', 'success');
+                showToast('Reminder moved to bin', 'success');
                 await loadReminders();
             } catch (err) {
                 showToast('Failed to delete reminder: ' + err.message);
@@ -145,21 +167,30 @@ async function handleSubmit(e) {
 }
 
 async function main() {
-    const layoutInfo = await initLayout('reminders');
-    if (!layoutInfo) return;
+    showLoadingSkeletons();
 
-    try {
-        const { settings } = await apiFetch('/settings');
-        timeZone = settings.timezone;
-    } catch (err) {
-        console.error('Failed to load settings, defaulting reminder times to UTC:', err);
-    }
+    const layoutPromise = initLayout('reminders');
+    const settingsPromise = fetchSettingsFast();
+    const remindersPromise = loadReminders();
+
+    const modalEl = document.getElementById('reminderModal');
+    modal = new bootstrap.Modal(modalEl);
 
     document.getElementById('addReminderBtn').addEventListener('click', () => openModal(null));
     document.getElementById('reminderForm').addEventListener('submit', handleSubmit);
 
     try {
-        await loadReminders();
+        const [layoutInfo, freshSettings] = await Promise.all([
+            layoutPromise,
+            settingsPromise,
+            remindersPromise
+        ]);
+        if (!layoutInfo) return;
+
+        if (freshSettings?.timezone && freshSettings.timezone !== timeZone) {
+            timeZone = freshSettings.timezone;
+            render();
+        }
     } catch (err) {
         console.error('Failed to load reminders:', err);
         document.querySelector('.reminders-page').insertAdjacentHTML('beforeend',

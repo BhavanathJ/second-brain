@@ -1,4 +1,4 @@
-import { initLayout } from '../layout.js';
+import { initLayout, getCachedSettings, fetchSettingsFast } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
@@ -7,6 +7,24 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str ?? '';
     return div.innerHTML;
+}
+
+function renderSkeletons(count = 2) {
+    return Array.from({ length: count }, () => `
+        <div class="task-item sb-skeleton sb-skeleton-card">
+            <div style="flex:1;">
+                <div class="sb-skeleton-line w-80"></div>
+                <div class="sb-skeleton-line w-40"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showLoadingSkeletons() {
+    ['quadrant-do-first', 'quadrant-schedule', 'quadrant-delegate', 'quadrant-eliminate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = renderSkeletons(2);
+    });
 }
 
 function formatDateTime(isoString, timeZone) {
@@ -20,7 +38,7 @@ function formatDateTime(isoString, timeZone) {
     });
 }
 
-let timeZone = 'UTC';
+let timeZone = getCachedSettings().timezone || 'UTC';
 let allTasks = [];
 let modal = null;
 let viewModal = null;
@@ -53,6 +71,7 @@ function renderTaskItem(task) {
 
 function renderQuadrant(mountId, tasks) {
     const mount = document.getElementById(mountId);
+    if (!mount) return;
     mount.innerHTML = tasks.length === 0
         ? '<div class="dash-empty">Nothing here.</div>'
         : tasks.map(renderTaskItem).join('');
@@ -100,11 +119,11 @@ function wireItemEvents() {
 
     document.querySelectorAll('.task-delete-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            const ok = await confirmAction('Move this task to Bin?');
+            const ok = await confirmAction('Move this task to the bin?');
             if (!ok) return;
             try {
                 await apiFetch(`/tasks/${btn.dataset.id}`, { method: 'DELETE' });
-                showToast('Task moved to Bin', 'success');
+                showToast('Task moved to bin', 'success');
                 await loadTasks();
             } catch (err) {
                 showToast('Failed to delete task: ' + err.message);
@@ -113,60 +132,56 @@ function wireItemEvents() {
     });
 }
 
-function localInputToISO(value) {
-    if (!value) return null;
-    return new Date(value).toISOString();
-}
-
 function isoToLocalInput(isoString) {
     if (!isoString) return '';
-    const d = new Date(isoString);
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return isoString.slice(0, 16);
+}
+
+function localInputToISO(localString) {
+    if (!localString) return null;
+    return new Date(localString).toISOString();
 }
 
 function openModal(taskId) {
-    if (!modal) {
-        const modalEl = document.getElementById('taskModal');
-        modal = new bootstrap.Modal(modalEl);
-    }
     const form = document.getElementById('taskForm');
     form.reset();
     document.getElementById('taskId').value = '';
+    document.getElementById('taskModalLabel').textContent = taskId ? 'Edit Task' : 'New Task';
 
     if (taskId) {
         const task = allTasks.find(t => t.id === taskId);
-        if (!task) return;
-        document.getElementById('taskModalTitle').textContent = 'Edit Task';
-        document.getElementById('taskId').value = task.id;
-        document.getElementById('taskTitle').value = task.title;
-        document.getElementById('taskDescription').value = task.description ?? '';
-        document.getElementById('taskDueAt').value = isoToLocalInput(task.due_at);
-        document.getElementById('taskUrgent').checked = task.urgent;
-        document.getElementById('taskImportant').checked = task.important;
-    } else {
-        document.getElementById('taskModalTitle').textContent = 'Add Task';
+        if (task) {
+            document.getElementById('taskId').value = task.id;
+            document.getElementById('taskTitle').value = task.title;
+            document.getElementById('taskDescription').value = task.description ?? '';
+            document.getElementById('taskDueAt').value = isoToLocalInput(task.due_at);
+            document.getElementById('taskUrgent').checked = task.urgent;
+            document.getElementById('taskImportant').checked = task.important;
+        }
     }
 
     modal.show();
 }
 
 function openViewModal(taskId) {
-    if (!viewModal) {
-        const viewModalEl = document.getElementById('viewTaskModal');
-        viewModal = new bootstrap.Modal(viewModalEl);
-    }
     const task = allTasks.find(t => t.id === taskId);
     if (!task) return;
 
     document.getElementById('viewTaskTitle').textContent = task.title;
-    document.getElementById('viewTaskDescription').textContent = task.description ?? '-';
-    document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTime(task.due_at, timeZone) : '-';
-    document.getElementById('viewTaskStatus').textContent = task.status === 'done' ? 'Done' : 'Pending';
-    document.getElementById('viewTaskUrgent').checked = task.urgent;
-    document.getElementById('viewTaskImportant').checked = task.important;
+    document.getElementById('viewTaskDue').textContent = task.due_at ? formatDateTime(task.due_at, timeZone) : 'No due date';
+    document.getElementById('viewTaskUrgent').textContent = task.urgent ? 'Yes' : 'No';
+    document.getElementById('viewTaskImportant').textContent = task.important ? 'Yes' : 'No';
+    document.getElementById('viewTaskStatus').textContent = task.status === 'done' ? 'Completed' : 'Pending';
 
-    // Set up Edit button to close view modal and open edit modal
+    const descEl = document.getElementById('viewTaskDescription');
+    if (task.description) {
+        descEl.textContent = task.description;
+        descEl.parentElement.classList.remove('d-none');
+    } else {
+        descEl.textContent = '';
+        descEl.parentElement.classList.add('d-none');
+    }
+
     const editBtn = document.getElementById('viewTaskEditBtn');
     editBtn.onclick = () => {
         viewModal.hide();
@@ -203,21 +218,30 @@ async function handleSubmit(e) {
 }
 
 async function main() {
-    const layoutInfo = await initLayout('tasks');
-    if (!layoutInfo) return;
+    showLoadingSkeletons();
 
-    try {
-        const { settings } = await apiFetch('/settings');
-        timeZone = settings.timezone;
-    } catch (err) {
-        console.error('Failed to load settings, defaulting task times to UTC:', err);
-    }
+    const layoutPromise = initLayout('tasks');
+    const settingsPromise = fetchSettingsFast();
+    const tasksPromise = loadTasks();
+
+    modal = new bootstrap.Modal(document.getElementById('taskModal'));
+    viewModal = new bootstrap.Modal(document.getElementById('viewTaskModal'));
 
     document.getElementById('addTaskBtn').addEventListener('click', () => openModal(null));
     document.getElementById('taskForm').addEventListener('submit', handleSubmit);
 
     try {
-        await loadTasks();
+        const [layoutInfo, freshSettings] = await Promise.all([
+            layoutPromise,
+            settingsPromise,
+            tasksPromise
+        ]);
+        if (!layoutInfo) return;
+
+        if (freshSettings?.timezone && freshSettings.timezone !== timeZone) {
+            timeZone = freshSettings.timezone;
+            render();
+        }
     } catch (err) {
         console.error('Failed to load tasks:', err);
         document.querySelector('.tasks-page').insertAdjacentHTML('beforeend',

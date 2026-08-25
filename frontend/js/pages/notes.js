@@ -214,12 +214,26 @@ async function handleCaptureSubmit(e) {
 }
 
 function currentFilterTags() {
-    return parseTags(document.getElementById('tagFilter').value);
+    return parseTags(document.getElementById('tagFilter')?.value || '');
+}
+
+function showLoadingSkeletons() {
+    const mount = document.getElementById('notesList');
+    if (!mount) return;
+    mount.innerHTML = Array.from({ length: 3 }, () => `
+        <div class="note-card sb-skeleton" style="min-height: 90px; padding: 1rem; margin-bottom: 0.8rem;">
+            <div class="sb-skeleton-line w-80"></div>
+            <div class="sb-skeleton-line w-60"></div>
+            <div class="sb-skeleton-line w-40"></div>
+        </div>
+    `).join('');
 }
 
 async function main() {
-    const layoutInfo = await initLayout('notes');
-    if (!layoutInfo) return;
+    showLoadingSkeletons();
+
+    editModal = new bootstrap.Modal(document.getElementById('noteModal'));
+    convertModal = new bootstrap.Modal(document.getElementById('convertNoteModal'));
 
     document.getElementById('captureForm').addEventListener('submit', handleCaptureSubmit);
     document.getElementById('editNoteForm').addEventListener('submit', handleEditSubmit);
@@ -231,7 +245,11 @@ async function main() {
     });
 
     try {
-        await loadNotes();
+        const [layoutInfo] = await Promise.all([
+            initLayout('notes'),
+            loadNotes()
+        ]);
+        if (!layoutInfo) return;
     } catch (err) {
         console.error('Failed to load notes:', err);
         document.querySelector('.notes-page').insertAdjacentHTML('beforeend',

@@ -61,17 +61,52 @@ function renderNavHTML(activePage) {
   `;
 }
 
+export function getCachedSettings() {
+    try {
+        const saved = localStorage.getItem('sb_cached_settings');
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return { timezone: 'UTC', week_starts_on: 0 };
+}
+
+export async function fetchSettingsFast() {
+    try {
+        const { settings } = await apiFetch('/settings');
+        localStorage.setItem('sb_cached_settings', JSON.stringify(settings));
+        return settings;
+    } catch (err) {
+        return getCachedSettings();
+    }
+}
+
+function renderProfileOptions(profiles, currentProfileId) {
+    return profiles
+        .map(p => `<option value="${p.id}"${p.id === currentProfileId ? ' selected' : ''}>${p.name}</option>`)
+        .join('');
+}
+
 async function populateProfileSwitcher(currentProfileId) {
     const select = document.getElementById('profileSwitcher');
+    if (!select) return;
 
+    // Fast-render cached profiles instantly if available
     try {
-        const { profiles } = await apiFetch('/profiles');
-        select.innerHTML = profiles
-            .map(p => `<option value="${p.id}"${p.id === currentProfileId ? ' selected' : ''}>${p.name}</option>`)
-            .join('');
-    } catch (err) {
-        console.error('Failed to load profiles:', err);
-    }
+        const cached = localStorage.getItem('sb_cached_profiles');
+        if (cached) {
+            const profiles = JSON.parse(cached);
+            select.innerHTML = renderProfileOptions(profiles, currentProfileId);
+        }
+    } catch {}
+
+    // Background fetch to keep profiles fresh
+    apiFetch('/profiles')
+        .then(({ profiles }) => {
+            localStorage.setItem('sb_cached_profiles', JSON.stringify(profiles));
+            select.innerHTML = renderProfileOptions(profiles, currentProfileId);
+        })
+        .catch(err => {
+            console.error('Failed to load profiles:', err);
+        });
 
     select.addEventListener('change', async () => {
         const newProfileId = select.value;
@@ -89,7 +124,7 @@ async function populateProfileSwitcher(currentProfileId) {
 }
 
 function initLogout() {
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
         const refreshToken = localStorage.getItem('refreshToken');
         try {
             await apiFetch('/auth/logout', {
@@ -122,7 +157,7 @@ export async function initLayout(activePage) {
     }
     mount.innerHTML = renderNavHTML(activePage);
 
-    await populateProfileSwitcher(profileId);
+    populateProfileSwitcher(profileId);
     initLogout();
     initAiOverlay();
 

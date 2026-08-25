@@ -1981,3 +1981,45 @@ a:hover {
     font-size: 0.68rem;
     color: var(--sb-muted);
 }
+
+/* ============================================================
+   SKELETON & SHIMMER LOADING SYSTEM
+   ============================================================ */
+.sb-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--sb-surface-alt) 25%,
+        var(--sb-surface) 50%,
+        var(--sb-surface-alt) 75%
+    );
+    background-size: 200% 100%;
+    animation: sbShimmer 1.4s ease-in-out infinite;
+    border: 1.5px solid var(--sb-border-light);
+    border-radius: var(--sb-radius-sm);
+}
+
+@keyframes sbShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.sb-skeleton-card {
+    min-height: 54px;
+    margin-bottom: 0.6rem;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sb-skeleton-line {
+    height: 14px;
+    margin-bottom: 6px;
+    border-radius: 3px;
+}
+.sb-skeleton-line:last-child {
+    margin-bottom: 0;
+}
+.sb-skeleton-line.w-80 { width: 80%; }
+.sb-skeleton-line.w-60 { width: 60%; }
+.sb-skeleton-line.w-40 { width: 40%; }

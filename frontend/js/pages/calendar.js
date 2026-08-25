@@ -1,4 +1,4 @@
-import { initLayout } from '../layout.js';
+import { initLayout, getCachedSettings, fetchSettingsFast } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
@@ -21,14 +21,15 @@ function labelForDate(dateStr, opts) {
     return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
 }
 
-let timeZone = 'UTC';
-let weekStartsOn = 0;
+const initialSettings = getCachedSettings();
+let timeZone = initialSettings.timezone || 'UTC';
+let weekStartsOn = initialSettings.week_starts_on ?? 0;
 let viewMode = 'month';
-let anchorDateStr;
+let anchorDateStr = getLocalDateString(timeZone);
 let itemsByDate = new Map();
-let selectedDateStr = null;
-const modalEl = document.getElementById('eventModal');
-const modal = new bootstrap.Modal(modalEl);
+let selectedDateStr = anchorDateStr;
+let modal = null;
+
 
 function bucketData(data) {
     const map = new Map();
@@ -246,19 +247,11 @@ async function handleEventSubmit(e) {
 }
 
 async function main() {
-    const layoutInfo = await initLayout('calendar');
-    if (!layoutInfo) return;
+    const modalEl = document.getElementById('eventModal');
+    modal = new bootstrap.Modal(modalEl);
 
-    try {
-        const { settings } = await apiFetch('/settings');
-        timeZone = settings.timezone;
-        weekStartsOn = settings.week_starts_on;
-    } catch (err) {
-        console.error('Failed to load settings, defaulting calendar to UTC/Sunday-start:', err);
-    }
-
-    anchorDateStr = getLocalDateString(timeZone);
-    selectedDateStr = anchorDateStr; // auto-select today on initial load, in every view mode
+    // Initial render using cached settings
+    renderCurrentView();
 
     document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
     document.getElementById('nextBtn').addEventListener('click', () => navigate(1));
@@ -268,8 +261,33 @@ async function main() {
     document.getElementById('addEventBtn').addEventListener('click', () => modal.show());
     document.getElementById('eventForm').addEventListener('submit', handleEventSubmit);
 
+    const layoutPromise = initLayout('calendar');
+    const settingsPromise = fetchSettingsFast();
+    const viewPromise = loadView();
+
     try {
-        await loadView();
+        const [layoutInfo, freshSettings] = await Promise.all([
+            layoutPromise,
+            settingsPromise,
+            viewPromise
+        ]);
+        if (!layoutInfo) return;
+
+        let needsRerender = false;
+        if (freshSettings?.timezone && freshSettings.timezone !== timeZone) {
+            timeZone = freshSettings.timezone;
+            needsRerender = true;
+        }
+        if (freshSettings?.week_starts_on !== undefined && freshSettings.week_starts_on !== weekStartsOn) {
+            weekStartsOn = freshSettings.week_starts_on;
+            needsRerender = true;
+        }
+
+        if (needsRerender) {
+            anchorDateStr = getLocalDateString(timeZone);
+            selectedDateStr = anchorDateStr;
+            await loadView();
+        }
     } catch (err) {
         console.error('Failed to load calendar:', err);
         document.querySelector('.calendar-page').insertAdjacentHTML('beforeend',

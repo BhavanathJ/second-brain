@@ -1,4 +1,4 @@
-import { initLayout } from '../layout.js';
+import { initLayout, getCachedSettings, fetchSettingsFast } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 
@@ -10,6 +10,7 @@ function escapeHtml(str) {
 
 function populateTimezoneSelect(currentTimezone) {
     const select = document.getElementById('timezoneSelect');
+    if (!select) return;
     const zones = Intl.supportedValuesOf('timeZone');
     select.innerHTML = zones
         .map(z => `<option value="${z}"${z === currentTimezone ? ' selected' : ''}>${z}</option>`)
@@ -17,10 +18,16 @@ function populateTimezoneSelect(currentTimezone) {
 }
 
 async function loadSettings() {
-    const { settings } = await apiFetch('/settings');
+    const cached = getCachedSettings();
+    populateTimezoneSelect(cached.timezone);
+    const weekStartEl = document.getElementById('weekStartSelect');
+    if (weekStartEl) weekStartEl.value = String(cached.week_starts_on ?? 0);
+
+    const settings = await fetchSettingsFast();
     populateTimezoneSelect(settings.timezone);
-    document.getElementById('weekStartSelect').value = String(settings.week_starts_on);
+    if (weekStartEl) weekStartEl.value = String(settings.week_starts_on);
 }
+
 
 async function loadProfiles(currentProfileId) {
     const { profiles } = await apiFetch('/profiles');
@@ -387,16 +394,21 @@ function initAiSettingsForm() {
 }
 
 async function main() {
-    const layoutInfo = await initLayout('settings');
-    if (!layoutInfo) return;
-
     document.getElementById('settingsForm').addEventListener('submit', handleSubmit);
     document.getElementById('addProfileForm').addEventListener('submit', handleAddProfile);
 
     initAiSettingsForm();
 
+    const layoutPromise = initLayout('settings');
+    const settingsPromise = loadSettings();
+
     try {
-        await loadSettings();
+        const [layoutInfo] = await Promise.all([
+            layoutPromise,
+            settingsPromise
+        ]);
+        if (!layoutInfo) return;
+
         await loadProfiles(layoutInfo.profileId);
     } catch (err) {
         console.error('Failed to load settings:', err);

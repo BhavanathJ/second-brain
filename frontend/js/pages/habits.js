@@ -1,4 +1,4 @@
-import { initLayout } from '../layout.js';
+import { initLayout, getCachedSettings, fetchSettingsFast } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
@@ -7,6 +7,21 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str ?? '';
     return div.innerHTML;
+}
+
+function renderSkeletons(count = 3) {
+    return Array.from({ length: count }, () => `
+        <div class="habit-card sb-skeleton" style="min-height: 110px; margin-bottom: 0.8rem; padding: 1rem;">
+            <div class="sb-skeleton-line w-80"></div>
+            <div class="sb-skeleton-line w-40" style="margin-bottom: 12px;"></div>
+            <div class="sb-skeleton-line w-60"></div>
+        </div>
+    `).join('');
+}
+
+function showLoadingSkeletons() {
+    const mount = document.getElementById('habitsList');
+    if (mount) mount.innerHTML = renderSkeletons(3);
 }
 
 function getLocalDateString(timeZone, date = new Date()) {
@@ -24,11 +39,10 @@ function dayLabel(dateStr) {
     return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })[0];
 }
 
-let timeZone = 'UTC';
+let timeZone = getCachedSettings().timezone || 'UTC';
 let habits = [];
 let last7Days = [];
-const modalEl = document.getElementById('habitModal');
-const modal = new bootstrap.Modal(modalEl);
+let modal = null;
 
 async function loadHabits() {
     const { habits: fetchedHabits } = await apiFetch('/habits');
@@ -37,14 +51,16 @@ async function loadHabits() {
     const todayStr = getLocalDateString(timeZone);
     last7Days = Array.from({ length: 7 }, (_, i) => addDays(todayStr, i - 6));
 
-    const logsPerHabit = await Promise.all(
-        habits.map(h => apiFetch(`/habits/${h.id}/logs?start=${last7Days[0]}&end=${last7Days[6]}`))
-    );
+    if (habits.length > 0) {
+        const logsPerHabit = await Promise.all(
+            habits.map(h => apiFetch(`/habits/${h.id}/logs?start=${last7Days[0]}&end=${last7Days[6]}`))
+        );
 
-    habits = habits.map((h, i) => ({
-        ...h,
-        loggedDates: new Set(logsPerHabit[i].logs.filter(l => l.completed).map(l => l.log_date)),
-    }));
+        habits = habits.map((h, i) => ({
+            ...h,
+            loggedDates: new Set((logsPerHabit[i]?.logs || []).filter(l => l.completed).map(l => l.log_date)),
+        }));
+    }
 
     render();
 }
@@ -54,7 +70,7 @@ function renderDayGrid(habit) {
     return `
     <div class="habit-week-grid">
       ${last7Days.map(dateStr => {
-        const isDone = habit.loggedDates.has(dateStr);
+        const isDone = habit.loggedDates ? habit.loggedDates.has(dateStr) : false;
         const isToday = dateStr === todayStr;
         return `<div class="habit-day-cell${isDone ? ' done' : ''}${isToday ? ' today' : ''}"
                      data-habit-id="${habit.id}" data-date="${dateStr}">${dayLabel(dateStr)}</div>`;
@@ -88,6 +104,7 @@ function renderHabitCard(habit) {
 
 function render() {
     const mount = document.getElementById('habitsList');
+    if (!mount) return;
     mount.innerHTML = habits.length === 0
         ? '<div class="dash-empty">No habits yet - add one to start tracking.</div>'
         : habits.map(renderHabitCard).join('');
@@ -175,21 +192,30 @@ async function handleSubmit(e) {
 }
 
 async function main() {
-    const layoutInfo = await initLayout('habits');
-    if (!layoutInfo) return;
+    showLoadingSkeletons();
 
-    try {
-        const { settings } = await apiFetch('/settings');
-        timeZone = settings.timezone;
-    } catch (err) {
-        console.error('Failed to load settings, defaulting habit dates to UTC:', err);
-    }
+    const layoutPromise = initLayout('habits');
+    const settingsPromise = fetchSettingsFast();
+    const habitsPromise = loadHabits();
+
+    const modalEl = document.getElementById('habitModal');
+    modal = new bootstrap.Modal(modalEl);
 
     document.getElementById('addHabitBtn').addEventListener('click', () => openModal(null));
     document.getElementById('habitForm').addEventListener('submit', handleSubmit);
 
     try {
-        await loadHabits();
+        const [layoutInfo, freshSettings] = await Promise.all([
+            layoutPromise,
+            settingsPromise,
+            habitsPromise
+        ]);
+        if (!layoutInfo) return;
+
+        if (freshSettings?.timezone && freshSettings.timezone !== timeZone) {
+            timeZone = freshSettings.timezone;
+            render();
+        }
     } catch (err) {
         console.error('Failed to load habits:', err);
         document.querySelector('.habits-page').insertAdjacentHTML('beforeend',

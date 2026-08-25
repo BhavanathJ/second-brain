@@ -35,17 +35,52 @@ function requireAuthGuard() {
     return true;
 }
 
-function renderNavHTML(activePage) {
-    const links = NAV_ITEMS.map(item => `
+function renderNavHTML(activePage, userRole, impersonatedBy, mustResetPassword) {
+    if (mustResetPassword) {
+        return `
+        <div class="impersonation-banner" style="background: var(--sb-accent-orange); color: #FFFFFF;">
+          <span>⚠️ <strong>Mandatory Password Reset:</strong> You must set a new password before accessing the system.</span>
+        </div>
+        <nav class="navbar navbar-expand-lg app-navbar">
+          <div class="container-fluid">
+            <span class="navbar-brand app-wordmark">
+              <img src="../assets/favicon.svg" class="app-brand-logo" alt="Logo" />
+              Second<span>Brain</span>
+            </span>
+            <div class="d-flex align-items-center gap-2 nav-controls ms-auto">
+              <button id="logoutBtn" class="btn btn-sm btn-outline-danger text-nowrap" type="button">Log out</button>
+            </div>
+          </div>
+        </nav>
+      `;
+    }
+
+    const navItems = [...NAV_ITEMS];
+    if (userRole === 'ADMIN') {
+        navItems.push({ label: 'Admin ⚡', href: 'admin.html', page: 'admin' });
+    }
+
+    const links = navItems.map(item => `
     <li class="nav-item">
       <a class="nav-link${item.page === activePage ? ' active' : ''}" href="${item.href}">${item.label}</a>
     </li>
   `).join('');
 
+    const impersonationBanner = (impersonatedBy || sessionStorage.getItem('sb_admin_backup_access')) ? `
+      <div class="impersonation-banner" id="impersonationBanner">
+        <span>⚠️ <strong>Impersonation Active:</strong> You are browsing the app as another user.</span>
+        <button type="button" class="impersonation-exit-btn" id="exitImpersonationBtn">Exit Impersonation &rarr;</button>
+      </div>
+    ` : '';
+
     return `
+    ${impersonationBanner}
     <nav class="navbar navbar-expand-lg app-navbar">
       <div class="container-fluid">
-        <a class="navbar-brand app-wordmark" href="dashboard.html">Second<span>Brain</span></a>
+        <a class="navbar-brand app-wordmark" href="dashboard.html">
+          <img src="../assets/favicon.svg" class="app-brand-logo" alt="Logo" />
+          Second<span>Brain</span>
+        </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#appNavCollapse">
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -149,17 +184,49 @@ export async function initLayout(activePage) {
 
     const payload = decodeAccessToken();
     const profileId = payload?.profile_id ?? null;
+    const userRole = payload?.role ?? 'USER';
+    const impersonatedBy = payload?.impersonated_by ?? null;
+    const mustResetPassword = Boolean(payload?.must_reset_password);
+
+    // Mandatory Reset Enforcement: Lock user to change-password.html
+    if (mustResetPassword && activePage !== 'change-password') {
+        window.location.href = 'change-password.html';
+        return null;
+    }
 
     const mount = document.getElementById('app-nav');
     if (!mount) {
         console.error('layout.js: no #app-nav element found on this page.');
         return null;
     }
-    mount.innerHTML = renderNavHTML(activePage);
+    mount.innerHTML = renderNavHTML(activePage, userRole, impersonatedBy, mustResetPassword);
 
-    populateProfileSwitcher(profileId);
+    const exitBtn = document.getElementById('exitImpersonationBtn');
+    if (exitBtn) {
+        exitBtn.addEventListener('click', () => {
+            const adminAccess = sessionStorage.getItem('sb_admin_backup_access');
+            const adminRefresh = sessionStorage.getItem('sb_admin_backup_refresh');
+            if (adminAccess) {
+                localStorage.setItem('accessToken', adminAccess);
+                if (adminRefresh) localStorage.setItem('refreshToken', adminRefresh);
+                sessionStorage.removeItem('sb_admin_backup_access');
+                sessionStorage.removeItem('sb_admin_backup_refresh');
+                localStorage.removeItem('sb_cached_settings');
+                localStorage.removeItem('sb_cached_profiles');
+                window.location.href = 'admin.html';
+            } else {
+                window.location.href = 'admin.html';
+            }
+        });
+    }
+
+    if (!mustResetPassword) {
+        populateProfileSwitcher(profileId);
+    }
     initLogout();
     initAiOverlay();
 
-    return { profileId };
+    return { profileId, mustResetPassword };
 }
+
+export const renderNav = initLayout;

@@ -1,5 +1,5 @@
-const supabase = require('../config/supabase');
-const noteService = require('./noteService');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
 const ENTITY_LABEL_CONFIG = {
     task: { table: 'tasks', column: 'title' },
@@ -10,26 +10,18 @@ const ENTITY_LABEL_CONFIG = {
 };
 
 async function logDeletion(profileId, entityType, entityId) {
-    const { error } = await supabase
-        .from('bin_entries')
-        .insert({ profile_id: profileId, entity_type: entityType, entity_id: entityId });
-
-    if (error) throw error;
+    const id = uuidv4();
+    const autoPurgeAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const stmt = db.prepare(`
+        INSERT INTO bin_entries (id, profile_id, entity_type, entity_id, deleted_at, auto_purge_at)
+        VALUES (?, ?, ?, ?, datetime('now'), ?)
+    `);
+    stmt.run(id, profileId, entityType, entityId, autoPurgeAt);
 }
 
-// bin_entries only stores entity_type/entity_id - not the entity's own
-// title/content - so this batches a second query per entity_type to
-// fetch a human-readable label for each entry. Soft-deleted rows still
-// exist in their original table (deleted_at set, row not removed), so
-// this reads them directly, no special "trash" storage involved.
 async function listBinEntries(profileId) {
-    const { data, error } = await supabase
-        .from('bin_entries')
-        .select('*')
-        .eq('profile_id', profileId)
-        .order('deleted_at', { ascending: false });
-
-    if (error) throw error;
+    const stmt = db.prepare('SELECT * FROM bin_entries WHERE profile_id = ? ORDER BY deleted_at DESC');
+    const data = stmt.all(profileId);
 
     const grouped = {};
     for (const entry of data) {
@@ -39,60 +31,38 @@ async function listBinEntries(profileId) {
 
     const labelMap = {};
 
-    await Promise.all(
-        Object.entries(grouped).map(async ([entityType, ids]) => {
-            const config = ENTITY_LABEL_CONFIG[entityType];
-            if (!config) return;
-            const { data: rows, error: rowsError } = await supabase
-                .from(config.table)
-                .select(`id, ${config.column}`)
-                .in('id', ids);
-            if (rowsError) throw rowsError;
-            rows.forEach(row => {
-                labelMap[row.id] = row[config.column];
-            });
-        })
-    );
+    for (const [entityType, ids] of Object.entries(grouped)) {
+        const config = ENTITY_LABEL_CONFIG[entityType];
+        if (!config || ids.length === 0) continue;
+
+        const placeholders = ids.map(() => '?').join(',');
+        const queryStmt = db.prepare(`SELECT id, ${config.column} as label FROM ${config.table} WHERE id IN (${placeholders})`);
+        const rows = queryStmt.all(...ids);
+        rows.forEach(row => {
+            labelMap[row.id] = row.label;
+        });
+    }
 
     return data.map(entry => ({
         ...entry,
-        // Truncate - notes' content can be long, titles rarely are.
-        // Falls back gracefully if the underlying row is somehow gone
-        // (e.g. a race with the purge cron) rather than showing undefined.
         label: (labelMap[entry.entity_id] ?? '(content unavailable)').slice(0, 100),
     }));
 }
 
 async function getBinEntryById(profileId, binEntryId) {
-    const { data, error } = await supabase
-        .from('bin_entries')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('id', binEntryId)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM bin_entries WHERE profile_id = ? AND id = ?');
+    return stmt.get(profileId, binEntryId) || null;
 }
 
 async function removeBinEntry(profileId, binEntryId) {
-    const { error } = await supabase
-        .from('bin_entries')
-        .delete()
-        .eq('profile_id', profileId)
-        .eq('id', binEntryId);
-
-    if (error) throw error;
+    const stmt = db.prepare('DELETE FROM bin_entries WHERE profile_id = ? AND id = ?');
+    stmt.run(profileId, binEntryId);
 }
 
 async function getExpiredBinEntries() {
-    const { data, error } = await supabase
-        .from('bin_entries')
-        .select('*')
-        .lte('auto_purge_at', new Date().toISOString());
-
-    if (error) throw error;
-    return data;
+    const nowISO = new Date().toISOString();
+    const stmt = db.prepare('SELECT * FROM bin_entries WHERE auto_purge_at <= ?');
+    return stmt.all(nowISO);
 }
 
 module.exports = {

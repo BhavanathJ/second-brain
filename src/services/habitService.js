@@ -1,101 +1,67 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 const { getLocalWeekStartDateString, addDaysToDateString, getLocalDateString } = require('../utils/profileTime');
 
 async function listHabits(profileId) {
-    const { data, error } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true });
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM habits WHERE profile_id = ? AND deleted_at IS NULL ORDER BY created_at ASC');
+    return stmt.all(profileId);
 }
 
 async function getHabitById(profileId, habitId) {
-    const { data, error } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('id', habitId)
-        .is('deleted_at', null)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM habits WHERE profile_id = ? AND id = ? AND deleted_at IS NULL');
+    return stmt.get(profileId, habitId) || null;
 }
 
 async function createHabit(profileId, { title, target_per_week }) {
-    const { data, error } = await supabase
-        .from('habits')
-        .insert({
-            profile_id: profileId,
-            title,
-            target_per_week: target_per_week ?? 7, // default: daily
-        })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const id = uuidv4();
+    const stmt = db.prepare(`
+        INSERT INTO habits (id, profile_id, title, target_per_week, deleted_at, created_at)
+        VALUES (?, ?, ?, ?, NULL, datetime('now'))
+    `);
+    stmt.run(id, profileId, title, target_per_week ?? 7);
+    return getHabitById(profileId, id);
 }
 
 async function updateHabit(profileId, habitId, fields) {
-    const { data, error } = await supabase
-        .from('habits')
-        .update({ ...fields })
-        .eq('profile_id', profileId)
-        .eq('id', habitId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
+    const current = await getHabitById(profileId, habitId);
+    if (!current) return null;
 
-    if (error) throw error;
-    return data;
+    const title = fields.title !== undefined ? fields.title : current.title;
+    const target = fields.target_per_week !== undefined ? fields.target_per_week : current.target_per_week;
+
+    const stmt = db.prepare(`
+        UPDATE habits
+        SET title = ?, target_per_week = ?
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(title, target, profileId, habitId);
+
+    return getHabitById(profileId, habitId);
 }
 
 async function softDeleteHabit(profileId, habitId) {
-    const { data, error } = await supabase
-        .from('habits')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', habitId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE habits
+        SET deleted_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(profileId, habitId);
+    return { id: habitId };
 }
 
 async function restoreHabit(profileId, habitId) {
-    const { data, error } = await supabase
-        .from('habits')
-        .update({ deleted_at: null })
-        .eq('profile_id', profileId)
-        .eq('id', habitId)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE habits
+        SET deleted_at = NULL
+        WHERE profile_id = ? AND id = ?
+    `);
+    stmt.run(profileId, habitId);
+    return getHabitById(profileId, habitId);
 }
 
 async function hardDeleteHabit(profileId, habitId) {
-    await supabase
-        .from('habit_logs')
-        .delete()
-        .eq('habit_id', habitId)
-        .eq('profile_id', profileId);
-
-    const { error } = await supabase
-        .from('habits')
-        .delete()
-        .eq('profile_id', profileId)
-        .eq('id', habitId);
-
-    if (error) throw error;
+    db.prepare('DELETE FROM habit_logs WHERE habit_id = ? AND profile_id = ?').run(habitId, profileId);
+    db.prepare('DELETE FROM habits WHERE profile_id = ? AND id = ?').run(profileId, habitId);
 }
 
 function daysBetween(aStr, bStr) {
@@ -106,15 +72,6 @@ function daysBetween(aStr, bStr) {
     return Math.round((t2 - t1) / (24 * 60 * 60 * 1000));
 }
 
-// --- Batch completion math (replaces the per-habit query loop) ---
-//
-// Previously, listHabits/getHabit issued up to 52 sequential Supabase
-// queries per habit (one per week, inside computeStreak). All of that is
-// now one query for the whole 52-week window, then pure date-math against
-// a Set of logged dates.
-
-// The full date range a streak can ever need: the current week plus up to
-// 52 weeks back.
 function getStreakWindow(timeZone, weekStartsOn, now = new Date()) {
     const currentWeekStart = getLocalWeekStartDateString(timeZone, weekStartsOn, now);
     return {
@@ -123,25 +80,22 @@ function getStreakWindow(timeZone, weekStartsOn, now = new Date()) {
     };
 }
 
-// ONE query: every completed log date for a profile (optionally filtered
-// to a single habit) across the 52-week streak window. Rows: { habit_id, log_date }.
 async function getCompletedLogs(profileId, timeZone, weekStartsOn, habitId = null, now = new Date()) {
     const { windowStart, windowEnd } = getStreakWindow(timeZone, weekStartsOn, now);
-    let query = supabase
-        .from('habit_logs')
-        .select('habit_id, log_date')
-        .eq('profile_id', profileId)
-        .eq('completed', true)
-        .gte('log_date', windowStart)
-        .lte('log_date', windowEnd);
-    if (habitId) query = query.eq('habit_id', habitId);
+    let sql = `
+        SELECT habit_id, log_date FROM habit_logs
+        WHERE profile_id = ? AND completed = 1 AND log_date >= ? AND log_date <= ?
+    `;
+    const params = [profileId, windowStart, windowEnd];
+    if (habitId) {
+        sql += ' AND habit_id = ?';
+        params.push(habitId);
+    }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(sql);
+    return stmt.all(...params);
 }
 
-// Group the rows above by habit_id into Set<log_date> for O(1) membership.
 function buildHabitLogIndex(logs) {
     const index = new Map();
     for (const log of logs) {
@@ -151,7 +105,6 @@ function buildHabitLogIndex(logs) {
     return index;
 }
 
-// How many of the 7 dates in a week (weekStartStr .. +6) are logged.
 function countInWeek(dateSet, weekStartStr) {
     let count = 0;
     for (let d = 0; d < 7; d++) {
@@ -165,8 +118,6 @@ function weeklyCountForDates(dateSet, timeZone, weekStartsOn, now = new Date()) 
     return countInWeek(dateSet, weekStartStr);
 }
 
-// Same streak algorithm as before, but reads from a pre-fetched Set of
-// log dates instead of issuing a Supabase query per week.
 function computeStreakForDates(dateSet, targetPerWeek, timeZone, weekStartsOn, now = new Date()) {
     let streak = 0;
     let weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, now);

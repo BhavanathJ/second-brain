@@ -1,45 +1,35 @@
-const supabase = require('../config/supabase');
-
-// Settings has exactly one row per profile (profile_id is the PK).
-// No create/delete needed - the row is created at signup and lives
-// as long as the profile does.
+const db = require('../config/db');
 
 async function getSettings(profileId) {
-    const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('profile_id', profileId)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM settings WHERE profile_id = ?');
+    return stmt.get(profileId) || null;
 }
 
 async function updateSettings(profileId, fields) {
-    const { data, error } = await supabase
-        .from('settings')
-        .update({ ...fields, updated_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .select()
-        .maybeSingle();
+    const current = await getSettings(profileId);
+    if (!current) throw new Error('Settings not found');
 
-    if (error) throw error;
-    return data;
+    const timezone = fields.timezone !== undefined ? fields.timezone : current.timezone;
+    const theme = fields.theme !== undefined ? fields.theme : current.theme;
+    const weekStartsOn = fields.week_starts_on !== undefined ? fields.week_starts_on : current.week_starts_on;
+
+    const stmt = db.prepare(`
+        UPDATE settings
+        SET timezone = ?, theme = ?, week_starts_on = ?, updated_at = datetime('now')
+        WHERE profile_id = ?
+    `);
+    stmt.run(timezone, theme, weekStartsOn, profileId);
+
+    return getSettings(profileId);
 }
 
-// Called once, right after a profile is created (signup's default
-// profile AND every additional profile via POST /api/profiles).
-// All columns except profile_id have DB defaults, so this is a
-// minimal insert - timezone/theme/week_starts_on come from schema.sql.
 async function createDefaultSettings(profileId) {
-    const { data, error } = await supabase
-        .from('settings')
-        .insert({ profile_id: profileId })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        INSERT OR IGNORE INTO settings (profile_id, timezone, theme, week_starts_on, updated_at)
+        VALUES (?, 'Asia/Kolkata', 'light', 0, datetime('now'))
+    `);
+    stmt.run(profileId);
+    return getSettings(profileId);
 }
 
 module.exports = { getSettings, updateSettings, createDefaultSettings };

@@ -1,115 +1,90 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
 async function listCalendarEvents(profileId, { start, end } = {}) {
-    let query = supabase
-        .from('calendar_events')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .order('starts_at', { ascending: true });
+    let sql = 'SELECT * FROM calendar_events WHERE profile_id = ? AND deleted_at IS NULL';
+    const params = [profileId];
 
-    if (start) query = query.gte('starts_at', start);
-    if (end) query = query.lte('starts_at', end);
+    if (start) {
+        sql += ' AND starts_at >= ?';
+        params.push(start);
+    }
+    if (end) {
+        sql += ' AND starts_at <= ?';
+        params.push(end);
+    }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    sql += ' ORDER BY starts_at ASC';
+    const stmt = db.prepare(sql);
+    return stmt.all(...params);
 }
 
 async function getCalendarEventById(profileId, eventId) {
-    const { data, error } = await supabase
-        .from('calendar_events')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('id', eventId)
-        .is('deleted_at', null)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM calendar_events WHERE profile_id = ? AND id = ? AND deleted_at IS NULL');
+    return stmt.get(profileId, eventId) || null;
 }
 
 async function createCalendarEvent(profileId, { title, starts_at, ends_at, location }) {
-    const { data, error } = await supabase
-        .from('calendar_events')
-        .insert({
-            profile_id: profileId,
-            title,
-            starts_at: starts_at,
-            ends_at: ends_at ?? null,
-            location: location ?? null,
-        })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const id = uuidv4();
+    const stmt = db.prepare(`
+        INSERT INTO calendar_events (id, profile_id, title, starts_at, ends_at, location, deleted_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, NULL, datetime('now'))
+    `);
+    stmt.run(id, profileId, title, starts_at, ends_at ?? null, location ?? null);
+    return getCalendarEventById(profileId, id);
 }
-async function updateCalendarEvent(profileId, eventId, fields) {
-    const { data, error } = await supabase
-        .from('calendar_events')
-        .update({ ...fields })
-        .eq('profile_id', profileId)
-        .eq('id', eventId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
 
-    if (error) throw error;
-    return data;
+async function updateCalendarEvent(profileId, eventId, fields) {
+    const current = await getCalendarEventById(profileId, eventId);
+    if (!current) return null;
+
+    const title = fields.title !== undefined ? fields.title : current.title;
+    const starts_at = fields.starts_at !== undefined ? fields.starts_at : current.starts_at;
+    const ends_at = fields.ends_at !== undefined ? fields.ends_at : current.ends_at;
+    const location = fields.location !== undefined ? fields.location : current.location;
+
+    const stmt = db.prepare(`
+        UPDATE calendar_events
+        SET title = ?, starts_at = ?, ends_at = ?, location = ?
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(title, starts_at, ends_at, location, profileId, eventId);
+
+    return getCalendarEventById(profileId, eventId);
 }
 
 async function softDeleteCalendarEvent(profileId, eventId) {
-    const { data, error } = await supabase
-        .from('calendar_events')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', eventId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE calendar_events
+        SET deleted_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(profileId, eventId);
+    return { id: eventId };
 }
 
 async function restoreCalendarEvent(profileId, eventId) {
-    const { data, error } = await supabase
-        .from('calendar_events')
-        .update({ deleted_at: null })
-        .eq('profile_id', profileId)
-        .eq('id', eventId)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE calendar_events
+        SET deleted_at = NULL
+        WHERE profile_id = ? AND id = ?
+    `);
+    stmt.run(profileId, eventId);
+    return getCalendarEventById(profileId, eventId);
 }
 
 async function hardDeleteCalendarEvent(profileId, eventId) {
-    const { error } = await supabase
-        .from('calendar_events')
-        .delete()
-        .eq('profile_id', profileId)
-        .eq('id', eventId);
-
-    if (error) throw error;
+    const stmt = db.prepare('DELETE FROM calendar_events WHERE profile_id = ? AND id = ?');
+    stmt.run(profileId, eventId);
 }
 
-// Used by the unified /api/calendar endpoint - fetches events
-// within a date range for the calendar view.
 async function getEventsForRange(profileId, startDate, endDate) {
-    const { data, error } = await supabase
-        .from('calendar_events')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .gte('starts_at', startDate)
-        .lte('starts_at', endDate)
-        .order('starts_at', { ascending: true });
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        SELECT * FROM calendar_events
+        WHERE profile_id = ? AND deleted_at IS NULL AND starts_at >= ? AND starts_at <= ?
+        ORDER BY starts_at ASC
+    `);
+    return stmt.all(profileId, startDate, endDate);
 }
 
 module.exports = {

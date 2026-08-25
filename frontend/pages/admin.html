@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Panel - Second Brain</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+    <link rel="alternate icon" href="../favicon.ico" />
+    <script>
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="../css/app.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app-nav"></div>
+
+    <main class="admin-page">
+        <!-- Admin Header -->
+        <header class="admin-header">
+            <div>
+                <div class="admin-title-wrap mb-2">
+                    <a href="dashboard.html" class="admin-back-btn">
+                        <span>&larr;</span> Back to Studio
+                    </a>
+                    <h1 class="admin-title">
+                        Admin <span class="admin-badge-panel">PANEL &#9889;</span>
+                    </h1>
+                </div>
+                <p class="admin-subtitle">User management and impersonation</p>
+            </div>
+            <button id="adminRefreshBtn" class="admin-refresh-btn" type="button">
+                &#128259; Refresh
+            </button>
+        </header>
+
+        <!-- Access Control Card -->
+        <section class="admin-card">
+            <div class="admin-card-header">
+                <div class="admin-card-icon">&#128101;</div>
+                <div>
+                    <h2 class="admin-card-title">Access Control</h2>
+                    <p class="admin-card-subtitle" id="accessControlSubtitle">Loading access control settings...</p>
+                </div>
+            </div>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div>
+                    <div class="fw-bold" style="font-size: 0.95rem;">Local self-sign-up</div>
+                    <div class="text-muted" style="font-size: 0.8rem;">Allow new users to register independently from the login page.</div>
+                </div>
+                <button id="toggleSelfSignupBtn" class="admin-toggle-btn disabled" type="button">
+                    Disabled
+                </button>
+            </div>
+        </section>
+
+        <!-- Login Rate Limiting Card -->
+        <section class="admin-card">
+            <div class="admin-card-header">
+                <div class="admin-card-icon">&#9881;</div>
+                <div>
+                    <h2 class="admin-card-title">Login Rate Limiting</h2>
+                    <p class="admin-card-subtitle">Reduce brute-force attacks; disable only for trusted environments. Changes are saved automatically.</p>
+                </div>
+            </div>
+
+            <div class="row g-3 align-items-end mb-4">
+                <div class="col-sm-4">
+                    <label class="form-label fw-bold mb-1" style="font-size: 0.82rem;">Rate Limiting</label>
+                    <div>
+                        <button id="toggleRateLimitBtn" class="admin-toggle-btn enabled w-100" type="button">
+                            Enabled
+                        </button>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label fw-bold mb-1" for="rateLimitWindow" style="font-size: 0.82rem;">Window (minutes)</label>
+                    <input type="number" id="rateLimitWindow" class="form-control" min="1" max="1440" value="15" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label fw-bold mb-1" for="rateLimitMaxAttempts" style="font-size: 0.82rem;">Max attempts</label>
+                    <input type="number" id="rateLimitMaxAttempts" class="form-control" min="1" max="100" value="20" />
+                </div>
+            </div>
+
+            <div class="pt-3 border-top">
+                <label class="form-label fw-bold mb-1" for="resetLockoutInput" style="font-size: 0.82rem;">Reset lockout (email/username)</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <input type="text" id="resetLockoutInput" class="form-control flex-grow-1" placeholder="user@example.com or username" />
+                    <span id="rateLimitSaveStatus" class="text-muted" style="font-size: 0.8rem;">All changes saved</span>
+                    <button id="resetLockoutBtn" class="admin-action-btn admin-btn-reset-pw" type="button">
+                        Reset
+                    </button>
+                </div>
+                <div id="lockoutFeedback" class="form-text mt-1"></div>
+            </div>
+
+            <!-- Active Locked Accounts Live List -->
+            <div class="pt-3 border-top mt-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="fw-bold" style="font-size: 0.85rem;">&#128274; Currently Locked Accounts & IPs</span>
+                    <span id="lockedAccountsCountBadge" class="admin-pill-btn active" style="cursor: default; font-size: 0.72rem;">0 Locked</span>
+                </div>
+                <div id="lockedAccountsContainer" class="d-flex flex-column gap-2">
+                    <div class="text-muted" style="font-size: 0.8rem;">No accounts or IPs are currently locked.</div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Users Management Card -->
+        <section class="admin-card">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                <div class="admin-card-header mb-0">
+                    <div class="admin-card-icon">&#128737;</div>
+                    <div>
+                        <h2 class="admin-card-title" id="usersTitle">Users (0)</h2>
+                        <p class="admin-card-subtitle">Manage user permissions, reset credentials, and switch accounts</p>
+                    </div>
+                </div>
+                <button id="openNewUserModalBtn" class="admin-refresh-btn" type="button" data-bs-toggle="modal" data-bs-target="#newUserModal">
+                    + New User
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="admin-users-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Role</th>
+                            <th>Active</th>
+                            <th>Must Reset</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">Loading users...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- New User Modal -->
+    <div class="modal fade" id="newUserModal" tabindex="-1" aria-labelledby="newUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border: var(--sb-border-width) solid var(--sb-border); border-radius: var(--sb-radius-lg); box-shadow: var(--sb-shadow);">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="newUserModalLabel">+ Create New User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="newUserForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="newUserName">Display Name</label>
+                            <input type="text" class="form-control" id="newUserName" placeholder="Full Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="newUserUsername">Username</label>
+                            <input type="text" class="form-control" id="newUserUsername" placeholder="username" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="newUserEmail">Email Address</label>
+                            <input type="email" class="form-control" id="newUserEmail" placeholder="user@example.com" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="newUserPassword">Initial Password</label>
+                            <input type="password" class="form-control" id="newUserPassword" placeholder="At least 8 characters" minlength="8" required />
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold" for="newUserRole">Role</label>
+                                <select class="form-select" id="newUserRole">
+                                    <option value="USER" selected>USER</option>
+                                    <option value="ADMIN">ADMIN</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold" for="newUserStatus">Status</label>
+                                <select class="form-select" id="newUserStatus">
+                                    <option value="active" selected>Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="newUserMustReset" />
+                            <label class="form-check-label fw-bold" for="newUserMustReset">Must reset password on first login</label>
+                        </div>
+                        <div id="newUserError" class="text-danger mt-2" style="font-size: 0.85rem;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="admin-refresh-btn btn-sm">Create User</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border: var(--sb-border-width) solid var(--sb-border); border-radius: var(--sb-radius-lg); box-shadow: var(--sb-shadow);">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">&#128273; Reset User Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="resetPasswordForm">
+                    <input type="hidden" id="resetPasswordUserId" />
+                    <div class="modal-body">
+                        <p id="resetPasswordUserLabel" class="text-muted mb-3" style="font-size: 0.9rem;"></p>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="adminNewPassword">New Password</label>
+                            <input type="password" class="form-control" id="adminNewPassword" placeholder="Minimum 8 characters" minlength="8" required />
+                        </div>
+                        <div id="resetPasswordError" class="text-danger mt-2" style="font-size: 0.85rem;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="admin-action-btn admin-btn-reset-pw">Set Password &amp; Require Reset</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="../js/pages/admin.js"></script>
+</body>
+
+</html>

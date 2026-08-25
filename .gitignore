@@ -1,8 +1,49 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Environment variables
 .env
+.env.*
+!.env.example
+
+# SQLite Databases & WAL/SHM temp files
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
+db/*.sqlite
+db/*.sqlite-wal
+db/*.sqlite-shm
+db/*.db
+db/*.db-wal
+db/*.db-shm
+
+# Logs
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS & Editor
 .DS_Store
-.env.dev
-.env.prod
-.claude
-.playwright-cli
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# AI / IDE Agent temporary artifacts
+.claude/
+.playwright-cli/
+.gemini/
+
+# Testing & Coverage
+coverage/
+.nyc_output/

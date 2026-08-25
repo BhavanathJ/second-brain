@@ -1,61 +1,62 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
 const calendarEventService = require('./calendarEventService');
 
 async function getTasksForRange(profileId, startDate, endDate) {
-    const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .gte('due_at', startDate)
-        .lte('due_at', endDate)
-        .order('due_at', { ascending: true });
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        SELECT * FROM tasks
+        WHERE profile_id = ? AND deleted_at IS NULL AND due_at >= ? AND due_at <= ?
+        ORDER BY due_at ASC
+    `);
+    const rows = stmt.all(profileId, startDate, endDate);
+    return rows.map(r => ({
+        ...r,
+        urgent: Boolean(r.urgent),
+        important: Boolean(r.important),
+    }));
 }
 
-// '*, habits(id, title, target_per_week)' is Supabase's foreign key join
-// syntax - works because habit_logs.habit_id references habits.id.
-// Returns each log with its parent habit nested inside, so the frontend
-// knows which habit each log belongs to without a second request.
 async function getHabitLogsForRange(profileId, startDate, endDate) {
-    const { data, error } = await supabase
-        .from('habit_logs')
-        .select('*, habits(id, title, target_per_week)')
-        .eq('profile_id', profileId)
-        .eq('completed', true)
-        .gte('log_date', startDate)
-        .lte('log_date', endDate)
-        .order('log_date', { ascending: true });
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        SELECT hl.*, h.id as habit_id, h.title as habit_title, h.target_per_week as habit_target_per_week
+        FROM habit_logs hl
+        JOIN habits h ON hl.habit_id = h.id
+        WHERE hl.profile_id = ? AND hl.completed = 1 AND hl.log_date >= ? AND hl.log_date <= ?
+        ORDER BY hl.log_date ASC
+    `);
+    const rows = stmt.all(profileId, startDate, endDate);
+    return rows.map(r => ({
+        id: r.id,
+        habit_id: r.habit_id,
+        profile_id: r.profile_id,
+        log_date: r.log_date,
+        completed: Boolean(r.completed),
+        created_at: r.created_at,
+        habits: {
+            id: r.habit_id,
+            title: r.habit_title,
+            target_per_week: r.habit_target_per_week,
+        }
+    }));
 }
 
 async function getRemindersForRange(profileId, startDate, endDate) {
-    const { data, error } = await supabase
-        .from('reminders')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .gte('remind_at', startDate)
-        .lte('remind_at', endDate)
-        .order('remind_at', { ascending: true });
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        SELECT * FROM reminders
+        WHERE profile_id = ? AND deleted_at IS NULL AND remind_at >= ? AND remind_at <= ?
+        ORDER BY remind_at ASC
+    `);
+    const rows = stmt.all(profileId, startDate, endDate);
+    return rows.map(r => ({
+        ...r,
+        is_done: Boolean(r.is_done)
+    }));
 }
 
-// Runs all four queries in parallel - total wait time is the slowest
-// single query, not the sum of all four.
 async function getCalendarData(profileId, startDate, endDate) {
-    const [tasks, habitLogs, calendarEvents, reminders] = await Promise.all([
-        getTasksForRange(profileId, startDate, endDate),
-        getHabitLogsForRange(profileId, startDate, endDate),
-        calendarEventService.getEventsForRange(profileId, startDate, endDate),
-        getRemindersForRange(profileId, startDate, endDate),
-    ]);
+    const tasks = await getTasksForRange(profileId, startDate, endDate);
+    const habitLogs = await getHabitLogsForRange(profileId, startDate, endDate);
+    const calendarEvents = await calendarEventService.getEventsForRange(profileId, startDate, endDate);
+    const reminders = await getRemindersForRange(profileId, startDate, endDate);
 
     return { tasks, habitLogs, calendarEvents, reminders };
 }

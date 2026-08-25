@@ -1,135 +1,103 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
 async function listNotes(profileId, { tags } = {}) {
-    let query = supabase
-        .from('notes')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+    let sql = 'SELECT * FROM notes WHERE profile_id = ? AND deleted_at IS NULL ORDER BY created_at DESC';
+    const stmt = db.prepare(sql);
+    const rows = stmt.all(profileId);
+
+    const notes = rows.map(r => ({
+        ...r,
+        tags: typeof r.tags === 'string' ? JSON.parse(r.tags || '[]') : (r.tags || [])
+    }));
 
     if (tags && tags.length > 0) {
-        query = query.contains('tags', tags);
+        return notes.filter(n => tags.some(t => n.tags.includes(t)));
     }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    return notes;
 }
 
 async function getNoteById(profileId, noteId) {
-    const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('id', noteId)
-        .is('deleted_at', null)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM notes WHERE profile_id = ? AND id = ? AND deleted_at IS NULL');
+    const r = stmt.get(profileId, noteId);
+    if (!r) return null;
+    return {
+        ...r,
+        tags: typeof r.tags === 'string' ? JSON.parse(r.tags || '[]') : (r.tags || [])
+    };
 }
 
 async function createNote(profileId, { content, tags }) {
-    const { data, error } = await supabase
-        .from('notes')
-        .insert({
-            profile_id: profileId,
-            content,
-            tags: tags ?? [],
-        })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const id = uuidv4();
+    const tagsJson = JSON.stringify(tags ?? []);
+    const stmt = db.prepare(`
+        INSERT INTO notes (id, profile_id, content, tags, converted_task_id, deleted_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, NULL, NULL, datetime('now'), datetime('now'))
+    `);
+    stmt.run(id, profileId, content, tagsJson);
+    return getNoteById(profileId, id);
 }
 
 async function updateNote(profileId, noteId, fields) {
-    const { data, error } = await supabase
-        .from('notes')
-        .update({ ...fields, updated_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', noteId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
+    const current = await getNoteById(profileId, noteId);
+    if (!current) return null;
 
-    if (error) throw error;
-    return data;
+    const content = fields.content !== undefined ? fields.content : current.content;
+    const tagsJson = fields.tags !== undefined ? JSON.stringify(fields.tags) : JSON.stringify(current.tags);
+
+    const stmt = db.prepare(`
+        UPDATE notes
+        SET content = ?, tags = ?, updated_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(content, tagsJson, profileId, noteId);
+
+    return getNoteById(profileId, noteId);
 }
 
-// Conditional write - only succeeds if the note is still unconverted.
-// Guards against two concurrent conversion requests both winning: the
-// second one gets `null` back instead of silently overwriting the
-// first request's converted_task_id.
 async function markNoteConverted(profileId, noteId, taskId) {
-    const { data, error } = await supabase
-        .from('notes')
-        .update({
-            converted_task_id: taskId,
-            updated_at: new Date().toISOString(),
-        })
-        .eq('profile_id', profileId)
-        .eq('id', noteId)
-        .is('deleted_at', null)
-        .is('converted_task_id', null)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data; // null if already converted by a concurrent request
+    const stmt = db.prepare(`
+        UPDATE notes
+        SET converted_task_id = ?, updated_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL AND converted_task_id IS NULL
+    `);
+    const info = stmt.run(taskId, profileId, noteId);
+    if (info.changes === 0) return null;
+    return getNoteById(profileId, noteId);
 }
 
 async function softDeleteNote(profileId, noteId) {
-    const { data, error } = await supabase
-        .from('notes')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', noteId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE notes
+        SET deleted_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(profileId, noteId);
+    return { id: noteId };
 }
 
 async function restoreNote(profileId, noteId) {
-    const { data, error } = await supabase
-        .from('notes')
-        .update({ deleted_at: null, updated_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', noteId)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE notes
+        SET deleted_at = NULL, updated_at = datetime('now')
+        WHERE profile_id = ? AND id = ?
+    `);
+    stmt.run(profileId, noteId);
+    return getNoteById(profileId, noteId);
 }
 
 async function hardDeleteNote(profileId, noteId) {
-    const { error } = await supabase
-        .from('notes')
-        .delete()
-        .eq('profile_id', profileId)
-        .eq('id', noteId);
-
-    if (error) throw error;
+    const stmt = db.prepare('DELETE FROM notes WHERE profile_id = ? AND id = ?');
+    stmt.run(profileId, noteId);
 }
 
-// Find note by converted_task_id and clear it (when converted task is deleted)
 async function clearConvertedTaskId(profileId, taskId) {
-    const { data, error } = await supabase
-        .from('notes')
-        .update({ converted_task_id: null, updated_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('converted_task_id', taskId)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE notes
+        SET converted_task_id = NULL, updated_at = datetime('now')
+        WHERE profile_id = ? AND converted_task_id = ?
+    `);
+    stmt.run(profileId, taskId);
 }
 
 module.exports = {

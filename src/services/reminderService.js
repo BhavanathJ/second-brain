@@ -1,118 +1,102 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
 async function listReminders(profileId, { isDone } = {}) {
-    let query = supabase
-        .from('reminders')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .order('remind_at', { ascending: true });
+    let sql = 'SELECT * FROM reminders WHERE profile_id = ? AND deleted_at IS NULL';
+    const params = [profileId];
 
-    if (isDone !== undefined) query = query.eq('is_done', isDone);
+    if (isDone !== undefined) {
+        sql += ' AND is_done = ?';
+        params.push(isDone ? 1 : 0);
+    }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    sql += ' ORDER BY remind_at ASC';
+    const stmt = db.prepare(sql);
+    const rows = stmt.all(...params);
+    return rows.map(r => ({ ...r, is_done: Boolean(r.is_done) }));
 }
 
 async function getReminderById(profileId, reminderId) {
-    const { data, error } = await supabase
-        .from('reminders')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('id', reminderId)
-        .is('deleted_at', null)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM reminders WHERE profile_id = ? AND id = ? AND deleted_at IS NULL');
+    const r = stmt.get(profileId, reminderId);
+    if (!r) return null;
+    return { ...r, is_done: Boolean(r.is_done) };
 }
 
 async function createReminder(profileId, { title, remind_at, entity_type, entity_id }) {
-    const { data, error } = await supabase
-        .from('reminders')
-        .insert({
-            profile_id: profileId,
-            title,
-            remind_at: remind_at,
-            entity_type: entity_type ?? null,
-            entity_id: entity_id ?? null,
-        })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const id = uuidv4();
+    const stmt = db.prepare(`
+        INSERT INTO reminders (id, profile_id, title, remind_at, entity_type, entity_id, is_done, deleted_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 0, NULL, datetime('now'))
+    `);
+    stmt.run(id, profileId, title, remind_at, entity_type ?? null, entity_id ?? null);
+    return getReminderById(profileId, id);
 }
 
 async function updateReminder(profileId, reminderId, fields) {
-    const { data, error } = await supabase
-        .from('reminders')
-        .update({ ...fields })
-        .eq('profile_id', profileId)
-        .eq('id', reminderId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
+    const current = await getReminderById(profileId, reminderId);
+    if (!current) return null;
 
-    if (error) throw error;
-    return data;
+    const title = fields.title !== undefined ? fields.title : current.title;
+    const remind_at = fields.remind_at !== undefined ? fields.remind_at : current.remind_at;
+    const entity_type = fields.entity_type !== undefined ? fields.entity_type : current.entity_type;
+    const entity_id = fields.entity_id !== undefined ? fields.entity_id : current.entity_id;
+    const is_done = fields.is_done !== undefined ? (fields.is_done ? 1 : 0) : (current.is_done ? 1 : 0);
+
+    const stmt = db.prepare(`
+        UPDATE reminders
+        SET title = ?, remind_at = ?, entity_type = ?, entity_id = ?, is_done = ?
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(title, remind_at, entity_type, entity_id, is_done, profileId, reminderId);
+
+    return getReminderById(profileId, reminderId);
 }
 
 async function softDeleteReminder(profileId, reminderId) {
-    const { data, error } = await supabase
-        .from('reminders')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', reminderId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE reminders
+        SET deleted_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(profileId, reminderId);
+    return { id: reminderId };
 }
 
 async function restoreReminder(profileId, reminderId) {
-    const { data, error } = await supabase
-        .from('reminders')
-        .update({ deleted_at: null })
-        .eq('profile_id', profileId)
-        .eq('id', reminderId)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE reminders
+        SET deleted_at = NULL
+        WHERE profile_id = ? AND id = ?
+    `);
+    stmt.run(profileId, reminderId);
+    return getReminderById(profileId, reminderId);
 }
 
 async function hardDeleteReminder(profileId, reminderId) {
-    const { error } = await supabase
-        .from('reminders')
-        .delete()
-        .eq('profile_id', profileId)
-        .eq('id', reminderId);
-
-    if (error) throw error;
+    const stmt = db.prepare('DELETE FROM reminders WHERE profile_id = ? AND id = ?');
+    stmt.run(profileId, reminderId);
 }
 
-// Called by cron job every minute - fires across all profiles at once.
 async function fireReminders() {
-    const { data, error } = await supabase
-        .from('reminders')
-        .update({ is_done: true })
-        .lte('remind_at', new Date().toISOString())
-        .eq('is_done', false)
-        .is('deleted_at', null)
-        .select();
+    const nowISO = new Date().toISOString();
+    const selectStmt = db.prepare(`
+        SELECT * FROM reminders
+        WHERE is_done = 0 AND deleted_at IS NULL AND remind_at <= ?
+    `);
+    const dueReminders = selectStmt.all(nowISO);
 
-    if (error) throw error;
-
-    if (data && data.length > 0) {
-        console.log(`[cron] Fired ${data.length} reminder(s):`, data.map(r => r.title));
+    if (dueReminders.length > 0) {
+        const updateStmt = db.prepare(`
+            UPDATE reminders
+            SET is_done = 1
+            WHERE is_done = 0 AND deleted_at IS NULL AND remind_at <= ?
+        `);
+        updateStmt.run(nowISO);
+        console.log(`[cron] Fired ${dueReminders.length} reminder(s):`, dueReminders.map(r => r.title));
     }
 
-    return data;
+    return dueReminders;
 }
 
 module.exports = {

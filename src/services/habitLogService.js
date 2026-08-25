@@ -1,68 +1,47 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
-// Get a single log entry for a habit on a specific date.
 async function getLogForDate(habitId, profileId, date) {
-    const { data, error } = await supabase
-        .from('habit_logs')
-        .select('*')
-        .eq('habit_id', habitId)
-        .eq('profile_id', profileId)
-        .eq('log_date', date)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM habit_logs WHERE habit_id = ? AND profile_id = ? AND log_date = ?');
+    const r = stmt.get(habitId, profileId, date);
+    if (!r) return null;
+    return { ...r, completed: Boolean(r.completed) };
 }
 
-// Mark a habit as completed for a specific date.
-// UNIQUE(habit_id, log_date) constraint in DB prevents double-logging -
-// Supabase will throw a 23505 error if this date already has a log,
-// which the controller catches and returns as a clean 409.
 async function createLog(habitId, profileId, date) {
-    const { data, error } = await supabase
-        .from('habit_logs')
-        .insert({
-            habit_id: habitId,
-            profile_id: profileId,
-            log_date: date,
-            completed: true,
-        })
-        .select()
-        .single();
+    const existing = await getLogForDate(habitId, profileId, date);
+    if (existing) {
+        const err = new Error('Log for this date already exists');
+        err.code = '23505';
+        throw err;
+    }
 
-    if (error) throw error;
-    return data;
+    const id = uuidv4();
+    const stmt = db.prepare(`
+        INSERT INTO habit_logs (id, habit_id, profile_id, log_date, completed, created_at)
+        VALUES (?, ?, ?, ?, 1, datetime('now'))
+    `);
+    stmt.run(id, habitId, profileId, date);
+    return getLogForDate(habitId, profileId, date);
 }
 
-// Unmark a habit completion for a specific date.
 async function deleteLog(habitId, profileId, date) {
-    const { data, error } = await supabase
-        .from('habit_logs')
-        .delete()
-        .eq('habit_id', habitId)
-        .eq('profile_id', profileId)
-        .eq('log_date', date)
-        .select()
-        .maybeSingle();
+    const existing = await getLogForDate(habitId, profileId, date);
+    if (!existing) return null;
 
-    if (error) throw error;
-    return data; // null if no log existed for that date
+    const stmt = db.prepare('DELETE FROM habit_logs WHERE habit_id = ? AND profile_id = ? AND log_date = ?');
+    stmt.run(habitId, profileId, date);
+    return existing;
 }
 
-// Get all logs for a habit within a date range.
-// Used by Calendar to render habit completion dots on specific days.
 async function getLogsForRange(habitId, profileId, startDate, endDate) {
-    const { data, error } = await supabase
-        .from('habit_logs')
-        .select('*')
-        .eq('habit_id', habitId)
-        .eq('profile_id', profileId)
-        .gte('log_date', startDate)
-        .lte('log_date', endDate)
-        .order('log_date', { ascending: true });
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        SELECT * FROM habit_logs
+        WHERE habit_id = ? AND profile_id = ? AND log_date >= ? AND log_date <= ?
+        ORDER BY log_date ASC
+    `);
+    const rows = stmt.all(habitId, profileId, startDate, endDate);
+    return rows.map(r => ({ ...r, completed: Boolean(r.completed) }));
 }
 
 module.exports = { getLogForDate, createLog, deleteLog, getLogsForRange };

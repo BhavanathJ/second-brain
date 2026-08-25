@@ -14,6 +14,7 @@ const calendarEventRoutes = require('./routes/calendarEventRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const { fireReminders } = require('./services/reminderService');
 const { purgeExpiredEntries } = require('./controllers/binController');
 
@@ -58,6 +59,8 @@ app.use('/api/calendar-events', calendarEventRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
+
 
 cron.schedule('* * * * *', async () => {
   try {

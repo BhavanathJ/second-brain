@@ -23,15 +23,40 @@ erDiagram
   BIN_ENTRIES }o..o{ NOTES : "logs delete (app-enforced)"
   BIN_ENTRIES }o..o{ HABITS : "logs delete (app-enforced)"
 
+  SYSTEM_SETTINGS {
+    int id PK
+    boolean self_signup_enabled
+    boolean rate_limit_enabled
+    int rate_limit_window_minutes
+    int rate_limit_max_attempts
+    timestamptz updated_at
+  }
+
+  LOGIN_ATTEMPTS {
+    uuid id PK
+    text identifier
+    text ip_address
+    int failed_count
+    timestamptz last_attempt_at
+    timestamptz locked_until
+  }
+
   USERS {
     uuid id PK
+    text name
+    text username
     text email
     text password_hash
+    text role
+    text status
+    boolean must_reset_password
+    timestamptz created_at
   }
   PROFILES {
     uuid id PK
     uuid user_id FK
     text name
+    timestamptz created_at
   }
   REFRESH_TOKENS {
     uuid id PK
@@ -40,20 +65,27 @@ erDiagram
     text token_hash
     timestamptz expires_at
     timestamptz revoked_at
+    timestamptz created_at
   }
   SETTINGS {
     uuid profile_id PK_FK
     text timezone
+    text theme
     smallint week_starts_on
+    timestamptz updated_at
   }
   TASKS {
     uuid id PK
     uuid profile_id FK
     text title
+    text description
+    text status
     boolean urgent
     boolean important
     timestamptz due_at
     timestamptz deleted_at
+    timestamptz created_at
+    timestamptz updated_at
   }
   NOTES {
     uuid id PK
@@ -62,6 +94,8 @@ erDiagram
     text_array tags
     uuid converted_task_id FK
     timestamptz deleted_at
+    timestamptz created_at
+    timestamptz updated_at
   }
   HABITS {
     uuid id PK
@@ -69,6 +103,7 @@ erDiagram
     text title
     smallint target_per_week
     timestamptz deleted_at
+    timestamptz created_at
   }
   HABIT_LOGS {
     uuid id PK
@@ -76,6 +111,7 @@ erDiagram
     uuid profile_id FK
     date log_date
     boolean completed
+    timestamptz created_at
   }
   CALENDAR_EVENTS {
     uuid id PK
@@ -83,7 +119,9 @@ erDiagram
     text title
     timestamptz starts_at
     timestamptz ends_at
+    text location
     timestamptz deleted_at
+    timestamptz created_at
   }
   REMINDERS {
     uuid id PK
@@ -92,7 +130,9 @@ erDiagram
     timestamptz remind_at
     text entity_type
     uuid entity_id
+    boolean is_done
     timestamptz deleted_at
+    timestamptz created_at
   }
   BIN_ENTRIES {
     uuid id PK

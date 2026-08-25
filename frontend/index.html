@@ -5,6 +5,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Second Brain</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="alternate icon" href="favicon.ico" />
     <script>
         document.documentElement.setAttribute('data-theme', 'light');
         localStorage.setItem('theme', 'light');
@@ -20,18 +22,28 @@
     <div class="auth-shell">
         <div class="auth-card">
             <div class="text-center mb-3">
-                <div class="auth-wordmark mb-0">Second<span>Brain</span></div>
+                <div class="auth-wordmark mb-0">
+                    <img src="assets/favicon.svg" class="auth-brand-logo" alt="Second Brain Logo" />
+                    Second<span>Brain</span>
+                </div>
+                <div id="authSetupSubtitle" class="text-muted mt-1" style="font-size: 0.82rem;"></div>
             </div>
 
-            <div class="auth-tabs">
-                <button type="button" class="auth-tab active" data-tab="login">Log in</button>
-                <button type="button" class="auth-tab" data-tab="signup">Sign up</button>
+            <!-- Setup Notice Banner for First Run -->
+            <div id="firstRunBanner" class="d-none alert mb-3" style="background: var(--sb-primary); border: 2px solid var(--sb-border); border-radius: var(--sb-radius); font-size: 0.8rem; font-weight: 700; color: #121212;">
+                &#9889; <strong>Initial System Setup:</strong> Create your Super Admin account to initialize Second Brain.
             </div>
+
+            <div class="auth-tabs" id="authTabsContainer">
+                <button type="button" class="auth-tab active" data-tab="login" id="loginTabBtn">Log in</button>
+                <button type="button" class="auth-tab" data-tab="signup" id="signupTabBtn">Sign up</button>
+            </div>
+
 
             <form id="loginForm">
                 <div class="mb-3">
-                    <label for="loginEmail" class="form-label">Email</label>
-                    <input type="email" class="form-control" id="loginEmail" required autocomplete="email" />
+                    <label for="loginEmail" class="form-label">Email or Username</label>
+                    <input type="text" class="form-control" id="loginEmail" required autocomplete="username" placeholder="user@example.com or username" />
                 </div>
                 <div class="mb-3">
                     <label for="loginPassword" class="form-label">Password</label>
@@ -47,9 +59,19 @@
             </form>
 
             <form id="signupForm" class="d-none">
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label for="signupName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="signupName" placeholder="Full Name" />
+                    </div>
+                    <div class="col-6">
+                        <label for="signupUsername" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="signupUsername" placeholder="username" />
+                    </div>
+                </div>
                 <div class="mb-3">
                     <label for="signupEmail" class="form-label">Email</label>
-                    <input type="email" class="form-control" id="signupEmail" required autocomplete="email" />
+                    <input type="email" class="form-control" id="signupEmail" required autocomplete="email" placeholder="user@example.com" />
                 </div>
                 <div class="mb-3">
                     <label for="signupPassword" class="form-label">Password</label>
@@ -73,6 +95,7 @@
                 <button type="submit" class="btn btn-primary w-100">Create account</button>
                 <div class="auth-error" id="signupError"></div>
             </form>
+
         </div>
     </div>
 

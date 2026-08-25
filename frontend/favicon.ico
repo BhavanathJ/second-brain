@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Neo-Brutalist Shadow -->
+  <rect x="7" y="7" width="52" height="52" rx="14" fill="#121212" />
+  <!-- Neo-Brutalist Card Background -->
+  <rect x="4" y="4" width="52" height="52" rx="14" fill="#FFD028" stroke="#121212" stroke-width="3.5" />
+
+  <!-- Brain Hemisphere Base / Neural Net -->
+  <g fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left Lobe -->
+    <path d="M22 20 C16 20, 14 26, 17 31 C14 36, 18 44, 25 43 C26 44, 29 44, 30 42" fill="#FFE57F" />
+    <!-- Right Lobe -->
+    <path d="M40 20 C46 20, 48 26, 45 31 C48 36, 44 44, 37 43 C36 44, 33 44, 32 42" fill="#FFE57F" />
+    <!-- Synaptic Lines -->
+    <path d="M22 28 L28 32 L26 38" />
+    <path d="M40 28 L34 32 L36 38" />
+  </g>
+
+  <!-- Neural Node Dots -->
+  <circle cx="22" cy="28" r="1.8" fill="#FF3366" stroke="#121212" stroke-width="1.2" />
+  <circle cx="28" cy="32" r="1.8" fill="#FF3366" stroke="#121212" stroke-width="1.2" />
+  <circle cx="26" cy="38" r="1.8" fill="#FF3366" stroke="#121212" stroke-width="1.2" />
+  <circle cx="40" cy="28" r="1.8" fill="#FF3366" stroke="#121212" stroke-width="1.2" />
+  <circle cx="34" cy="32" r="1.8" fill="#FF3366" stroke="#121212" stroke-width="1.2" />
+  <circle cx="36" cy="38" r="1.8" fill="#FF3366" stroke="#121212" stroke-width="1.2" />
+
+  <!-- Electric Lightning Bolt (Center Feature) -->
+  <!-- Shadow of Bolt -->
+  <polygon points="34,10 21,30 31,30 25,52 45,26 33,26" fill="#121212" transform="translate(1.5, 1.5)" />
+  <!-- Main Bolt -->
+  <polygon points="34,10 21,30 31,30 25,52 45,26 33,26" fill="#FF3366" stroke="#121212" stroke-width="2.5" stroke-linejoin="round" />
+</svg>

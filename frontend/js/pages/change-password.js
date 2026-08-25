@@ -34,10 +34,20 @@ async function handleChangePassword(e) {
 }
 
 async function main() {
-    // 'settings' keeps the Settings nav link highlighted while on this
-    // sub-page, since there's no separate top-level nav entry for it.
-    const layoutInfo = await initLayout('settings');
+    // 'change-password' tells initLayout where we are
+    const layoutInfo = await initLayout('change-password');
     if (!layoutInfo) return;
+
+    if (layoutInfo.mustResetPassword) {
+        const backBtn = document.getElementById('backToSettingsBtn');
+        if (backBtn) backBtn.classList.add('d-none');
+
+        const title = document.getElementById('changePasswordTitle');
+        if (title) title.textContent = 'Set New Password (Required)';
+
+        const curLabel = document.querySelector('label[for="currentPassword"]');
+        if (curLabel) curLabel.textContent = 'Current (or Temporary) Password';
+    }
 
     document.getElementById('changePasswordForm').addEventListener('submit', handleChangePassword);
 }

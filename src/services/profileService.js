@@ -1,51 +1,30 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
 async function listProfilesForUser(userId) {
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true });
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at ASC');
+    return stmt.all(userId);
 }
 
 async function countProfilesForUser(userId) {
-    const { count, error } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-    if (error) throw error;
-    return count;
+    const stmt = db.prepare('SELECT COUNT(*) as count FROM profiles WHERE user_id = ?');
+    const res = stmt.get(userId);
+    return res ? res.count : 0;
 }
 
 async function createProfile(userId, name) {
-    const { data, error } = await supabase
-        .from('profiles')
-        .insert({ user_id: userId, name })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const id = uuidv4();
+    const stmt = db.prepare(`
+        INSERT INTO profiles (id, user_id, name, created_at)
+        VALUES (?, ?, ?, datetime('now'))
+    `);
+    stmt.run(id, userId, name);
+    return findProfileForUser(userId, id);
 }
 
-// Ownership check baked into the query itself - eq('user_id', ...) AND
-// eq('id', ...) in one call, rather than fetching by id then comparing
-// in JS. A profile that exists but belongs to someone else returns
-// null here, same as a profile that doesn't exist at all.
 async function findProfileForUser(userId, profileId) {
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('id', profileId)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM profiles WHERE user_id = ? AND id = ?');
+    return stmt.get(userId, profileId) || null;
 }
 
 module.exports = {

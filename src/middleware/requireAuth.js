@@ -13,10 +13,32 @@ function requireAuth(req, res, next) {
     const payload = verifyAccessToken(token);
     req.userId = payload.sub;
     req.profileId = payload.profile_id;
+    req.userRole = payload.role || 'USER';
+    req.user = payload;
+
+    // Strict Enforcement: If user must reset password, block all other API access until reset
+    if (payload.must_reset_password) {
+      const isPasswordChange = req.baseUrl === '/api/auth' && (req.path === '/password' || req.path === '/logout');
+      if (!isPasswordChange) {
+        return res.status(403).json({
+          error: 'Password reset required. You must change your password before accessing the panel.',
+          must_reset_password: true
+        });
+      }
+    }
+
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired access token.' });
   }
 }
 
-module.exports = { requireAuth };
+
+function requireAdmin(req, res, next) {
+  if (req.userRole !== 'ADMIN') {
+    return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin };

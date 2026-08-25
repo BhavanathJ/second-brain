@@ -1,21 +1,25 @@
 -- ============================================================
--- SECOND BRAIN - FULL SCHEMA (locked)
--- Principle: every feature has ONE owning table. Calendar and
--- Dashboard never store data - they only query/combine tables
--- that already exist (Tasks, Habits, Notes, Reminders, Calendar
--- events). No duplication, no sync logic needed anywhere.
+-- SECOND BRAIN - SUPABASE (POSTGRESQL) FULL SCHEMA
 -- ============================================================
 
 -- ----------------------------
--- AUTH / IDENTITY
+-- AUTH / IDENTITY / ACCESS CONTROL
 -- ----------------------------
 
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL DEFAULT '',
+  username TEXT UNIQUE,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'USER' CHECK (role IN ('ADMIN', 'USER')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  must_reset_password BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_users_email ON users (LOWER(email));
+CREATE INDEX idx_users_username ON users (LOWER(username));
 
 -- Netflix-style profiles. This is the hard isolation boundary -
 -- every content table below points at profile_id, never user_id.
@@ -42,14 +46,45 @@ CREATE TABLE refresh_tokens (
 CREATE INDEX idx_refresh_user_active ON refresh_tokens (user_id) WHERE revoked_at IS NULL;
 
 -- ----------------------------
--- SETTINGS (one row per profile)
+-- SYSTEM / ADMIN CONFIGURATION
+-- ----------------------------
+
+CREATE TABLE system_settings (
+  id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  self_signup_enabled BOOLEAN NOT NULL DEFAULT true,
+  rate_limit_enabled BOOLEAN NOT NULL DEFAULT true,
+  rate_limit_window_minutes INT NOT NULL DEFAULT 15,
+  rate_limit_max_attempts INT NOT NULL DEFAULT 20,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Seed single system configuration row
+INSERT INTO system_settings (id, self_signup_enabled, rate_limit_enabled, rate_limit_window_minutes, rate_limit_max_attempts)
+VALUES (1, true, true, 15, 20)
+ON CONFLICT (id) DO NOTHING;
+
+-- Login Attempts & Brute-Force Rate Limiting Table
+CREATE TABLE login_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  identifier TEXT NOT NULL,
+  ip_address TEXT,
+  failed_count INT NOT NULL DEFAULT 1,
+  last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  locked_until TIMESTAMPTZ
+);
+
+CREATE INDEX idx_login_attempts_identifier ON login_attempts (LOWER(identifier));
+CREATE INDEX idx_login_attempts_ip ON login_attempts (ip_address);
+
+-- ----------------------------
+-- USER SETTINGS (one row per profile)
 -- ----------------------------
 
 CREATE TABLE settings (
   profile_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
   timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
   theme TEXT NOT NULL DEFAULT 'light',
-  week_starts_on SMALLINT NOT NULL DEFAULT 0, -- 0=Sunday, 1=Monday (locked: Sunday)
+  week_starts_on SMALLINT NOT NULL DEFAULT 0, -- 0=Sunday, 1=Monday (default: Sunday)
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -83,8 +118,6 @@ CREATE TABLE notes (
   profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   tags TEXT[] NOT NULL DEFAULT '{}', -- free text tags, no managed tag table
-  -- LINK not copy: note keeps a pointer to the task it became.
-  -- Stays NULL until/unless the note is converted.
   converted_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -95,14 +128,7 @@ CREATE INDEX idx_notes_profile_active ON notes (profile_id) WHERE deleted_at IS 
 CREATE INDEX idx_notes_tags ON notes USING GIN (tags);
 
 -- ----------------------------
--- HABITS - weekly-quota model (locked).
--- target_per_week = how many completions needed in a Sun-Sat window.
--- "Goal reached?" is NEVER stored - always computed live:
---   COUNT(habit_logs WHERE habit_id=X AND completed=true
---         AND log_date BETWEEN <this week's Sunday> AND <this week's Saturday>)
---   compared against target_per_week. No cached flag, so it can't drift.
--- Calendar reads habit_logs directly for the day-checkbox - same row,
--- no duplication (Option A principle).
+-- HABITS - weekly-quota model
 -- ----------------------------
 
 CREATE TABLE habits (
@@ -128,8 +154,6 @@ CREATE INDEX idx_habitlogs_profile_date ON habit_logs (profile_id, log_date);
 
 -- ----------------------------
 -- CALENDAR-ONLY EVENTS
--- For things that are ONLY ever a calendar entry - not a task,
--- not a habit. e.g. "Dentist appointment, 3pm-4pm".
 -- ----------------------------
 
 CREATE TABLE calendar_events (
@@ -147,9 +171,7 @@ CREATE INDEX idx_calendar_profile_active ON calendar_events (profile_id) WHERE d
 CREATE INDEX idx_calendar_starts ON calendar_events (profile_id, starts_at) WHERE deleted_at IS NULL;
 
 -- ----------------------------
--- REMINDERS (standalone AND attachable - one table, nullable link)
--- entity_type/entity_id NULL = standalone.
--- entity_type='task'|'habit'|'calendar_event', entity_id = that row's id = attached.
+-- REMINDERS (standalone AND attachable)
 -- ----------------------------
 
 CREATE TABLE reminders (
@@ -158,7 +180,7 @@ CREATE TABLE reminders (
   title TEXT NOT NULL,
   remind_at TIMESTAMPTZ NOT NULL,
   entity_type TEXT,   -- NULL | 'task' | 'habit' | 'calendar_event' | 'note'
-  entity_id UUID,      -- not a real FK (entity_type decides target table) - app-enforced
+  entity_id UUID,      -- not a real FK (entity_type decides target table)
   is_done BOOLEAN NOT NULL DEFAULT false,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -168,9 +190,7 @@ CREATE INDEX idx_reminders_profile_active ON reminders (profile_id) WHERE delete
 CREATE INDEX idx_reminders_due ON reminders (profile_id, remind_at) WHERE deleted_at IS NULL AND is_done = false;
 
 -- ----------------------------
--- BIN - single log every soft-delete writes to, across all features.
--- entity_id is NOT a real FK for the same reason as reminders above:
--- it can point at tasks, notes, habits, calendar_events, or reminders.
+-- BIN (soft-delete recovery across all domains)
 -- ----------------------------
 
 CREATE TABLE bin_entries (

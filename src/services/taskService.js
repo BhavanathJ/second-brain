@@ -1,106 +1,107 @@
-const supabase = require('../config/supabase');
+const db = require('../config/db');
+const { v4: uuidv4 } = require('uuid');
 
 async function listTasks(profileId, { urgent, important, status } = {}) {
-    let query = supabase
-        .from('tasks')
-        .select('*')
-        .eq('profile_id', profileId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+    let sql = 'SELECT * FROM tasks WHERE profile_id = ? AND deleted_at IS NULL';
+    const params = [profileId];
 
-    if (urgent !== undefined) query = query.eq('urgent', urgent);
-    if (important !== undefined) query = query.eq('important', important);
-    if (status !== undefined) query = query.eq('status', status);
+    if (urgent !== undefined) {
+        sql += ' AND urgent = ?';
+        params.push(urgent ? 1 : 0);
+    }
+    if (important !== undefined) {
+        sql += ' AND important = ?';
+        params.push(important ? 1 : 0);
+    }
+    if (status !== undefined) {
+        sql += ' AND status = ?';
+        params.push(status);
+    }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    sql += ' ORDER BY created_at DESC';
+    const stmt = db.prepare(sql);
+    const rows = stmt.all(...params);
+    return rows.map(r => ({
+        ...r,
+        urgent: Boolean(r.urgent),
+        important: Boolean(r.important),
+    }));
 }
 
 async function getTaskById(profileId, taskId) {
-    const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('id', taskId)
-        .is('deleted_at', null)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare('SELECT * FROM tasks WHERE profile_id = ? AND id = ? AND deleted_at IS NULL');
+    const r = stmt.get(profileId, taskId);
+    if (!r) return null;
+    return {
+        ...r,
+        urgent: Boolean(r.urgent),
+        important: Boolean(r.important),
+    };
 }
 
 async function createTask(profileId, { title, description, urgent, important, due_at, status }) {
-    const { data, error } = await supabase
-        .from('tasks')
-        .insert({
-            profile_id: profileId,
-            title,
-            description: description ?? null,
-            urgent: urgent ?? false,
-            important: important ?? false,
-            due_at: due_at ?? null,
-            status: status ?? 'pending',
-        })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    const id = uuidv4();
+    const stmt = db.prepare(`
+        INSERT INTO tasks (id, profile_id, title, description, status, urgent, important, due_at, deleted_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'), datetime('now'))
+    `);
+    stmt.run(
+        id,
+        profileId,
+        title,
+        description ?? null,
+        status ?? 'pending',
+        urgent ? 1 : 0,
+        important ? 1 : 0,
+        due_at ?? null
+    );
+    return getTaskById(profileId, id);
 }
 
 async function updateTask(profileId, taskId, fields) {
-    const { data, error } = await supabase
-        .from('tasks')
-        .update({ ...fields, updated_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', taskId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
+    const current = await getTaskById(profileId, taskId);
+    if (!current) return null;
 
-    if (error) throw error;
-    return data;
+    const title = fields.title !== undefined ? fields.title : current.title;
+    const description = fields.description !== undefined ? fields.description : current.description;
+    const status = fields.status !== undefined ? fields.status : current.status;
+    const urgent = fields.urgent !== undefined ? (fields.urgent ? 1 : 0) : (current.urgent ? 1 : 0);
+    const important = fields.important !== undefined ? (fields.important ? 1 : 0) : (current.important ? 1 : 0);
+    const due_at = fields.due_at !== undefined ? fields.due_at : current.due_at;
+
+    const stmt = db.prepare(`
+        UPDATE tasks
+        SET title = ?, description = ?, status = ?, urgent = ?, important = ?, due_at = ?, updated_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(title, description, status, urgent, important, due_at, profileId, taskId);
+
+    return getTaskById(profileId, taskId);
 }
 
 async function softDeleteTask(profileId, taskId) {
-    const { data, error } = await supabase
-        .from('tasks')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', taskId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE tasks
+        SET deleted_at = datetime('now')
+        WHERE profile_id = ? AND id = ? AND deleted_at IS NULL
+    `);
+    stmt.run(profileId, taskId);
+    return { id: taskId };
 }
 
-// Restore: clears deleted_at so the task reappears in normal queries.
 async function restoreTask(profileId, taskId) {
-    const { data, error } = await supabase
-        .from('tasks')
-        .update({ deleted_at: null, updated_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('id', taskId)
-        .select()
-        .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const stmt = db.prepare(`
+        UPDATE tasks
+        SET deleted_at = NULL, updated_at = datetime('now')
+        WHERE profile_id = ? AND id = ?
+    `);
+    stmt.run(profileId, taskId);
+    return getTaskById(profileId, taskId);
 }
 
-// Permanent delete: removes the row entirely. Called from Bin only -
-// normal task deletion always uses softDeleteTask.
 async function hardDeleteTask(profileId, taskId) {
-    const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('profile_id', profileId)
-        .eq('id', taskId);
-
-    if (error) throw error;
+    const stmt = db.prepare('DELETE FROM tasks WHERE profile_id = ? AND id = ?');
+    stmt.run(profileId, taskId);
 }
 
 module.exports = {

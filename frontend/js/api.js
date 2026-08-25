@@ -65,3 +65,5 @@ async function tryRefresh() {
     refreshPromise = null; // clear so the next real token expiry triggers a fresh refresh
     return result;
 }
+
+export const apiRequest = apiFetch;

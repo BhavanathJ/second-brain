@@ -74,6 +74,20 @@ loginForm.addEventListener('submit', async (e) => {
     }
 });
 
+// Detect browser timezone for auto-detection on signup
+function getBrowserTimezone() {
+    try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const validTimezones = Intl.supportedValuesOf('timeZone');
+        if (validTimezones.includes(tz)) {
+            return tz;
+        }
+    } catch (e) {
+        // Ignore errors, fallback to default
+    }
+    return null;
+}
+
 // --- Signup ---
 signupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -90,10 +104,13 @@ signupForm.addEventListener('submit', async (e) => {
         return;
     }
 
+    // Auto-detect browser timezone
+    const timezone = getBrowserTimezone();
+
     try {
         const data = await apiFetch('/auth/signup', {
             method: 'POST',
-            body: JSON.stringify({ username, email, password }),
+            body: JSON.stringify({ username, email, password, timezone }),
         });
         handleAuthSuccess(data);
     } catch (err) {

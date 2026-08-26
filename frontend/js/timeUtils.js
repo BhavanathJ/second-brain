@@ -4,7 +4,7 @@
 // day" something falls on, or convert a local date to the correct UTC
 // instant for querying the backend.
 
-function getOffsetMinutes(date, timeZone) {
+export function getOffsetMinutes(date, timeZone) {
     const dtf = new Intl.DateTimeFormat('en-US', {
         timeZone,
         hourCycle: 'h23',

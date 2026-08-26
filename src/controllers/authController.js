@@ -22,7 +22,7 @@ async function issueTokenPair({ userId, profileId, username }) {
 }
 
 async function signup(req, res) {
-  const { email, username, password } = req.body;
+  const { email, username, password, timezone } = req.body;
 
   if (!email || !username || !password) {
     return res.status(400).json({ error: 'Email, username, and password are required.' });
@@ -32,6 +32,16 @@ async function signup(req, res) {
   }
   if (!USERNAME_REGEX.test(username)) {
     return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, and underscores only.' });
+  }
+
+  // Validate timezone if provided
+  let validatedTimezone = null;
+  if (timezone) {
+    const validTimezones = new Set(Intl.supportedValuesOf('timeZone'));
+    if (validTimezones.has(timezone)) {
+      validatedTimezone = timezone;
+    }
+    // If invalid, we'll just use the DB default (Asia/Kolkata)
   }
 
   try {
@@ -47,7 +57,7 @@ async function signup(req, res) {
     const passwordHash = await hashPassword(password);
     const user = await authService.createUser({ email, username, passwordHash });
     const profile = await authService.createDefaultProfile(user.id);
-    await settingsService.createDefaultSettings(profile.id);
+    await settingsService.createDefaultSettings(profile.id, validatedTimezone);
 
     const tokens = await issueTokenPair({ userId: user.id, profileId: profile.id, username: user.username });
 

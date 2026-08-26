@@ -2,6 +2,8 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { resolveTheme } from '../themeUtils.js';
+import { getOffsetMinutes } from '../timeUtils.js';
+import { getTimezoneDisplayLabel, normalizeTimezone } from '../timezoneNames.js';
 
 let renameProfileModal = null;
 let deleteProfileModal = null;
@@ -15,19 +17,97 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+function getOffsetMinutesValue(timezone) {
+    return getOffsetMinutes(new Date(), timezone);
+}
+
+function formatOffsetString(offsetMinutes) {
+    const roundedMinutes = Math.round(offsetMinutes);
+    const sign = roundedMinutes >= 0 ? '+' : '-';
+    const absMinutes = Math.abs(roundedMinutes);
+    const hours = Math.floor(absMinutes / 60);
+    const minutes = absMinutes % 60;
+    return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 function populateTimezoneSelect(currentTimezone) {
     const select = document.getElementById('timezoneSelect');
-    const zones = Intl.supportedValuesOf('timeZone');
-    select.innerHTML = zones
-        .map(z => `<option value="${z}"${z === currentTimezone ? ' selected' : ''}>${z}</option>`)
+    const rawZones = Array.from(Intl.supportedValuesOf('timeZone'));
+
+    const normalizedCurrent = normalizeTimezone(currentTimezone);
+
+    // Normalize all zones and ensure modern canonical zones are present
+    const normalizedZones = rawZones.map(z => normalizeTimezone(z));
+    if (normalizedCurrent) {
+        normalizedZones.push(normalizedCurrent);
+    }
+    normalizedZones.push('Asia/Kolkata');
+
+    // Deduplicate unique IANA zone identifiers
+    const uniqueZones = Array.from(new Set(normalizedZones));
+
+    // Sort zones by GMT offset ascending, then by friendly label alphabetically
+    const zonesWithOffset = uniqueZones.map(z => {
+        const offset = getOffsetMinutesValue(z);
+        const offsetStr = formatOffsetString(offset);
+        const label = getTimezoneDisplayLabel(z, offsetStr);
+        return { zone: z, offset, label };
+    }).sort((a, b) => a.offset - b.offset || a.label.localeCompare(b.label));
+
+    select.innerHTML = zonesWithOffset
+        .map(({ zone, label }) => {
+            return `<option value="${zone}"${zone === normalizedCurrent ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+        })
         .join('');
+}
+
+function getBrowserTimezone() {
+    try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const validTimezones = Intl.supportedValuesOf('timeZone');
+        if (validTimezones.includes(tz)) {
+            return normalizeTimezone(tz);
+        }
+    } catch (e) {
+        // Ignore errors, fallback to default
+    }
+    return null;
 }
 
 async function loadSettings() {
     const { settings } = await apiFetch('/settings');
-    populateTimezoneSelect(settings.timezone);
-    document.getElementById('themeSelect').value = settings.theme;
+
+    // Auto-detect browser timezone on first visit if using default
+    // This helps users who didn't go through signup auto-detection
+    let displayTimezone = normalizeTimezone(settings.timezone);
+    if (displayTimezone === 'Asia/Kolkata') {
+        const browserTZ = getBrowserTimezone();
+        if (browserTZ && browserTZ !== 'Asia/Kolkata') {
+            displayTimezone = browserTZ;
+        }
+    }
+
+    populateTimezoneSelect(displayTimezone);
+    // Initialize the offset display with current selection
+    updateTimezoneOffsetDisplay(displayTimezone);
+
+    // Update offset display when user changes timezone selection
+    document.getElementById('timezoneSelect').addEventListener('change', (e) => {
+        updateTimezoneOffsetDisplay(e.target.value);
+    });
+
+    const themeEl = document.getElementById('themeSelect');
+    if (themeEl) themeEl.value = settings.theme;
     document.getElementById('weekStartSelect').value = String(settings.week_starts_on);
+}
+
+function updateTimezoneOffsetDisplay(timezone) {
+    const offsetDisplay = document.getElementById('timezoneOffsetDisplay');
+    if (offsetDisplay) {
+        const offsetMinutes = getOffsetMinutesValue(timezone);
+        const offsetStr = formatOffsetString(offsetMinutes);
+        offsetDisplay.textContent = `Current offset: ${offsetStr}`;
+    }
 }
 
 async function loadProfiles(currentProfileId) {
@@ -63,11 +143,14 @@ async function loadProfiles(currentProfileId) {
 
 async function handleSubmit(e) {
     e.preventDefault();
+    const themeEl = document.getElementById('themeSelect');
     const payload = {
         timezone: document.getElementById('timezoneSelect').value,
-        theme: document.getElementById('themeSelect').value,
         week_starts_on: Number(document.getElementById('weekStartSelect').value),
     };
+    if (themeEl) {
+        payload.theme = themeEl.value;
+    }
 
     try {
         await apiFetch('/settings', { method: 'PATCH', body: JSON.stringify(payload) });
@@ -93,8 +176,11 @@ async function handleAddProfile(e) {
     const name = nameInput.value.trim();
     if (!name) return;
 
+    // Auto-detect browser timezone for new profile
+    const timezone = getBrowserTimezone();
+
     try {
-        await apiFetch('/profiles', { method: 'POST', body: JSON.stringify({ name }) });
+        await apiFetch('/profiles', { method: 'POST', body: JSON.stringify({ name, timezone }) });
         nameInput.value = '';
         window.location.reload();
     } catch (err) {

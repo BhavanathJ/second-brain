@@ -14,13 +14,22 @@ async function listProfiles(req, res) {
 }
 
 async function createProfile(req, res) {
-    const { name } = req.body;
+    const { name, timezone } = req.body;
 
     if (!name || !name.trim()) {
         return res.status(400).json({ error: 'Profile name is required.' });
     }
 
     const trimmedName = name.trim();
+
+    // Validate timezone if provided
+    let validatedTimezone = null;
+    if (timezone) {
+        const validTimezones = new Set(Intl.supportedValuesOf('timeZone'));
+        if (validTimezones.has(timezone)) {
+            validatedTimezone = timezone;
+        }
+    }
 
     try {
 
@@ -32,7 +41,7 @@ async function createProfile(req, res) {
         }
 
         const profile = await profileService.createProfile(req.userId, trimmedName);
-        await settingsService.createDefaultSettings(profile.id);
+        await settingsService.createDefaultSettings(profile.id, validatedTimezone);
 
         return res.status(201).json({ profile });
     } catch (err) {

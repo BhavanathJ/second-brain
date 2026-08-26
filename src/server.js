@@ -26,23 +26,34 @@ const app = express();
 app.set('trust proxy', 1);
 
 const allowedOrigins = Array.isArray(config.corsOrigin)
-    ? config.corsOrigin
-    : [config.corsOrigin];
+  ? config.corsOrigin
+  : [config.corsOrigin];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, file://, server-to-server)
+    if (!origin || origin === 'null') {
+      return callback(null, true);
+    }
+
+    // In development, allow any localhost or 127.0.0.1 origin
+    if (config.nodeEnv === 'development') {
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Cleanly deny CORS without throwing unhandled server errors
+    return callback(null, false);
+  },
+  credentials: true
+}));
 
 app.use(express.json());
-
-app.use('/api', cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (same-origin requests, file://, etc.)
-        // and requests from allowed origins
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true
-}));
 
 const { globalApiLimiter } = require('./middleware/rateLimiters');
 app.use('/api', globalApiLimiter);

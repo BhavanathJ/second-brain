@@ -31,10 +31,15 @@ async function updateSettings(profileId, fields) {
 // profile AND every additional profile via POST /api/profiles).
 // All columns except profile_id have DB defaults, so this is a
 // minimal insert — timezone/theme/week_starts_on come from schema.sql.
-async function createDefaultSettings(profileId) {
+// Optional timezone param allows auto-detected browser timezone at signup.
+async function createDefaultSettings(profileId, timezone = null) {
+    const insertData = { profile_id: profileId };
+    if (timezone) {
+        insertData.timezone = timezone;
+    }
     const { data, error } = await supabase
         .from('settings')
-        .insert({ profile_id: profileId })
+        .insert(insertData)
         .select()
         .single();
 

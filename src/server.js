@@ -95,4 +95,4 @@ app.use((err, req, res, next) => {
 
 app.listen(config.port, () => {
   console.log(`Second Brain API running on port ${config.port} (${config.nodeEnv})`);
-});
+}); 

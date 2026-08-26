@@ -1,192 +1,253 @@
 # Second Brain
 
-A personal second-brain app: capture notes, manage tasks on an Eisenhower matrix, track weekly habits, keep a unified calendar, set reminders, and recycle anything through a 30-day bin — all behind a Netflix-style multi-profile login.
+A full-featured personal productivity and "second brain" system: capture rich notes, organize tasks on an interactive Eisenhower matrix, build weekly habits with streak analytics, view a unified timezone-aware calendar, schedule automated reminders, and recycle deleted items via a 30-day auto-purging bin — all secured behind a Netflix-style multi-profile authentication system.
 
-Backend (this repo) is a Node.js/Express API backed by **Supabase (Postgres)**. The frontend is a dependency-free vanilla-JS static app served separately.
+The **backend** is an Express 4 REST API built on Node.js with direct **Supabase (PostgreSQL)** queries, JWT session management, background cron jobs, and production-ready rate limiting. The **frontend** is a responsive, dependency-free vanilla JavaScript (ES Modules) static web app with Bootstrap 5 and customized modern styling.
 
 ---
 
 ## Features
 
-| Feature | What it does |
+| Feature | Description |
 |---|---|
-| **Auth & profiles** | Email/password signup & login, refresh-token sessions, logout, change password. Up to **5 profiles** per account (netflix-style), each with fully isolated data. |
-| **Tasks** | Eisenhower matrix (urgent / important), `pending`/`done` status, due dates. A task with a `due_at` automatically appears on the calendar. |
-| **Notes** | Free-text capture with tags. **Convert a note to a task** — it links (never copies), so the task keeps a pointer back to the note. |
-| **Habits** | Weekly-quota model (`target_per_week`, e.g. 7 = daily, 3 = 3×/week). Log completions per day; streaks are **computed live** from `habit_logs` (never stored, so they can't drift), capped at a 52-week window. |
-| **Calendar** | Unified day/week/month view combining tasks-with-due-dates, habit day checkboxes (read straight from `habit_logs`), and calendar-only events. Timezone/DST-correct day bounds. |
-| **Reminders** | Standalone or attached to a task/habit/event/note. A cron job fires them every minute. |
-| **Bin** | Every soft-delete across all features lands here; restore or permanently delete; **30-day auto-purge** via a midnight cron. |
-| **Settings** | Per-profile timezone, theme (light/dark/system), and week start (Sunday/Monday). |
-| **Dashboard** | Today / tomorrow / next-7-days / overdue summary of tasks due in your timezone. |
+| **Auth & Multi-Profile** | Secure email/password authentication with `bcryptjs`, JWT access tokens (15m) + refresh token rotation (30d), and password change. Supports up to **5 isolated profiles** per account with instant profile switching. |
+| **Eisenhower Tasks Matrix** | Organize tasks by urgency and importance (Do First, Schedule, Delegate, Don't Do). Tasks with a `due_at` timestamp seamlessly sync with the calendar and dashboard. |
+| **Notes & Task Conversion** | Rich markdown/text capture with flexible multi-tag filtering. **One-click conversion** links notes to tasks with pointer references (avoids data duplication and race conditions). |
+| **Habit Tracking & Streaks** | Flexible weekly quota model (`target_per_week`, e.g., 7 = daily, 3 = 3×/week). Streaks and weekly completions are **dynamically computed** from raw daily logs across a 52-week window (zero drift). |
+| **Unified Calendar** | Combined day, week, and month views displaying tasks with due dates, habit completions, standalone calendar events, and scheduled reminders. Fully DST and timezone-aware. |
+| **Automated Reminders** | Set standalone reminders or attach them to tasks, habits, notes, or calendar events. A background cron job checks and triggers due reminders every minute. |
+| **Recycle Bin (30-Day Auto-Purge)** | Universal soft-delete system across all entities. Restore items or permanently delete them. A midnight cron job automatically purges items older than 30 days. |
+| **Profile Settings** | Per-profile IANA timezone selection, theme preferences (light/dark/system), and customizable first day of the week (Sunday vs. Monday). |
+| **Dashboard** | Instant summary of tasks categorized into *Today*, *Tomorrow*, *Next 7 Days*, and *Overdue* relative to the profile's local midnight. |
+| **Rate Limiting & Security** | Granular endpoint protection using `express-rate-limit` (login, signup, refresh, password change, global API) with automatic development bypass and reverse-proxy support. |
 
 ---
 
-## Tech stack
+## Tech Stack
 
-- **Backend:** Node.js (CommonJS), Express 4, `jsonwebtoken` + `bcryptjs`, `node-cron`
-- **Database:** Supabase — PostgreSQL (no ORM; direct Supabase JS queries against the schema in [`db/schema.sql`](db/schema.sql))
-- **Frontend:** Vanilla ES-module JS, Bootstrap 5, single shared `app.css`, no build step
-- **Timezone math:** hand-rolled, DST-correct (`Intl.DateTimeFormat` offset sampling) in [`src/utils/profileTime.js`](src/utils/profileTime.js), mirrored client-side in [`frontend/js/timeUtils.js`](frontend/js/timeUtils.js)
+- **Backend Runtime:** Node.js (CommonJS, Node 18+)
+- **API Framework:** Express 4.x
+- **Database:** PostgreSQL via Supabase (`@supabase/supabase-js`, direct SQL schema in [`db/schema.sql`](db/schema.sql))
+- **Authentication & Security:** `jsonwebtoken`, `bcryptjs`, `express-rate-limit`, CORS
+- **Job Scheduling:** `node-cron` (every-minute reminder dispatch, daily bin cleanup)
+- **Frontend:** Vanilla JavaScript (ES6+ modules), Bootstrap 5, Custom CSS, HTML5
+- **Date & Time Engine:** Hand-rolled DST-accurate timezone computations (`Intl.DateTimeFormat`) in [`src/utils/profileTime.js`](src/utils/profileTime.js) and mirrored client-side in [`frontend/js/timeUtils.js`](frontend/js/timeUtils.js)
 
 ---
 
-## Project structure
+## Project Structure
 
 ```
 ├── db/
-│   ├── schema.sql          # Full Postgres schema (tables, indexes, constraints)
-│   └── schema-erd.svg      # Visual ER diagram
+│   ├── schema.sql              # PostgreSQL DDL (tables, indexes, foreign keys, constraints)
+│   ├── schema-erd.svg          # Visual Entity-Relationship Diagram (ERD)
+│   ├── schema-erd.dot          # GraphViz DOT source for ERD
+│   └── schema-erd.mmd          # Mermaid source for ERD
 ├── src/
-│   ├── server.js           # Express app, routes, cron jobs
-│   ├── config/             # env.js (validated config), supabase.js (client)
-│   ├── routes/             # One router per resource
-│   ├── controllers/        # Request/response layer
-│   ├── services/           # Business logic (Supabase queries)
-│   ├── middleware/         # requireAuth (JWT bearer)
-│   └── utils/              # jwt, password, refreshToken, profileTime
+│   ├── server.js               # Express application entrypoint, routes mounting, cron jobs
+│   ├── config/
+│   │   ├── env.js              # Environment variable validation and defaults
+│   │   └── supabase.js         # Supabase client singleton (Service Role)
+│   ├── routes/                 # Express routers for each domain resource
+│   ├── controllers/            # Request parsing, status codes, and HTTP responses
+│   ├── services/               # Business logic and database operations
+│   ├── middleware/
+│   │   ├── requireAuth.js      # JWT authentication and active profile resolution
+│   │   └── rateLimiters.js     # Rate limit definitions and dev bypass
+│   └── utils/
+│       ├── jwt.js              # Access token signing and verification
+│       ├── password.js         # bcrypt password hashing and comparison
+│       ├── refreshToken.js     # Refresh token generation and lifecycle
+│       └── profileTime.js      # DST-safe day/week/month boundary computations
 ├── frontend/
-│   ├── index.html          # Login / signup screen
-│   ├── pages/              # dashboard, tasks, notes, habits, calendar,
-│   │                       # reminders, bin, settings, change-password
-│   ├── js/                 # api.js, auth.js, themeUtils.js, timeUtils.js, …
-│   └── css/app.css
-├── tests/                  # Deterministic stress/regression suite (no runner needed)
-├── api.md                  # Full API reference
+│   ├── index.html              # Landing, authentication (login/signup), and profile selection
+│   ├── pages/                  # Static HTML templates
+│   │   ├── dashboard.html      # Overview & upcoming agenda
+│   │   ├── tasks.html          # Eisenhower matrix & task manager
+│   │   ├── notes.html          # Tagged notes & task conversion
+│   │   ├── habits.html         # Weekly quotas & streak visualization
+│   │   ├── calendar.html       # Month/week/day calendar views
+│   │   ├── reminders.html      # Reminder list & triggers
+│   │   ├── bin.html            # Soft-deleted items & restore
+│   │   ├── settings.html       # Timezone, theme, week start preferences
+│   │   └── change-password.html# Authenticated password reset
+│   ├── js/
+│   │   ├── api.js              # Centralized fetch wrapper with auth header injection
+│   │   ├── auth.js             # Client-side session storage & token refresh
+│   │   ├── layout.js           # Shared navigation bar and profile dropdown
+│   │   ├── timeUtils.js        # Client-side timezone & date formatting
+│   │   ├── themeUtils.js       # Light / Dark theme management
+│   │   ├── toast.js            # Notification alerts
+│   │   ├── confirmDialog.js    # Modal confirmation helpers
+│   │   └── pages/              # Page-specific frontend controllers
+│   └── css/
+│       └── app.css             # Main styling, design tokens, and components
+├── api.md                      # Comprehensive API route and schema reference
 └── package.json
 ```
 
-The backend does **not** serve the frontend — the two run independently (see [Running the frontend](#running-the-frontend)).
+---
+
+## Rate Limiting & Security
+
+The application includes multi-tier rate limiting via [`src/middleware/rateLimiters.js`](src/middleware/rateLimiters.js):
+
+| Limiter | Target | Limit | Window | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Global API** | `/api/*` | 300 requests | 15 mins | Guard against runaway client loops and DDoS |
+| **Login** | `/api/auth/login` | 10 attempts | 15 mins | Brute-force protection on user credentials |
+| **Signup** | `/api/auth/signup` | 5 creations | 1 hour | Prevents automated account creation spam |
+| **Token Refresh** | `/api/auth/refresh` | 60 requests | 15 mins | Multi-tab session safe; restricts token replay abuse |
+| **Change Password**| `/api/auth/password`| 5 attempts | 15 mins | Protects against credential stuffing via active tokens |
+
+> **Development Mode:** Rate limits are automatically bypassed when `NODE_ENV !== 'production'` to ensure smooth local testing and debugging.  
+> **Reverse Proxy Support:** Express is configured with `app.set('trust proxy', 1)` to accurately detect client IP addresses behind hosting proxies like Render.
 
 ---
 
-## Getting started
+## Getting Started
 
 ### Prerequisites
 
-- Node.js **18+** (developed and tested on Node 24)
-- A Supabase project (free tier is fine)
+- **Node.js**: v18.0.0 or higher (developed and tested on Node 20+)
+- **Supabase**: Free-tier project (or any Postgres instance with Supabase API support)
 
-### 1. Install
+---
+
+### 1. Installation
+
+Clone the repository and install backend dependencies:
 
 ```bash
+git clone <repository-url>
+cd "Second Brain"
 npm install
 ```
 
-### 2. Set up the database
+---
 
-Open your Supabase project → **SQL Editor** → paste and run [`db/schema.sql`](db/schema.sql). That creates every table, index, and constraint. (`db/schema-erd.svg` is a visual of the same schema.)
+### 2. Database Setup
 
-### 3. Configure environment
+1. Log in to your [Supabase Dashboard](https://app.supabase.com) and create or open your project.
+2. Go to the **SQL Editor** in the left sidebar.
+3. Copy the entire contents of [`db/schema.sql`](db/schema.sql), paste into the editor, and click **Run**.
+4. All required tables (`users`, `profiles`, `tasks`, `notes`, `habits`, `habit_logs`, `reminders`, `calendar_events`, `bin`, `settings`, `refresh_tokens`), indexes, and triggers will be created.
+
+---
+
+### 3. Environment Configuration
+
+Create your `.env` file from the example:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in the values (see the [environment variables](#environment-variables) table). Find your Supabase URL and service-role key in **Supabase → Project Settings → API**.
+Populate the required environment variables:
 
-> ⚠️ The service-role key bypasses Row-Level Security — keep it out of any client-side code. The API uses it because auth + RLS is delegated to the server layer.
-
-### 4. Run the backend
-
-```bash
-npm run dev          # node --watch, auto-restarts on change
-# or
-npm start            # plain start
+```env
+PORT=4000
+NODE_ENV=development
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+JWT_ACCESS_SECRET=your-secure-random-secret-key
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN_DAYS=30
+CORS_ORIGIN=http://localhost:5500
 ```
 
-The API listens on `http://localhost:4000` (override with `PORT`). Health check: `GET /health`.
-
-### 5. Run the frontend
-
-The frontend is static — serve the `frontend/` directory with any static server on port **5500** (matches the default `CORS_ORIGIN`):
-
-```bash
-# from the project root
-npx serve frontend -l 5500
-# or VS Code "Live Server", or: cd frontend && python -m http.server 5500
-```
-
-Open `http://localhost:5500`, sign up, and log in.
-
-> The frontend's API base URL is hard-coded to `http://localhost:4000/api` in [`frontend/js/api.js`](frontend/js/api.js) — change it for any non-local backend.
+> 🔑 **Generate a secure JWT secret:**  
+> Run: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
 
 ---
 
-## Environment variables
+### 4. Running the Backend
+
+Start the API server in development mode (with auto-reload):
+
+```bash
+npm run dev
+```
+
+Or run in standard mode:
+
+```bash
+npm start
+```
+
+- API server will listen on `http://localhost:4000`.
+- Health check endpoint: `GET http://localhost:4000/health`.
+
+---
+
+### 5. Running the Frontend
+
+The frontend is completely static and communicates with the backend via REST. Serve the `frontend/` directory using any local HTTP server on port **5500** (to match the default `CORS_ORIGIN`):
+
+```bash
+# Using npx serve:
+npx serve frontend -l 5500
+
+# Or Python:
+cd frontend && python -m http.server 5500
+```
+
+Open `http://localhost:5500` in your browser, create an account, and get started!
+
+---
+
+## Environment Variables Reference
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `PORT` | no | `4000` | API port |
-| `NODE_ENV` | no | `development` | `development` / `production` |
-| `SUPABASE_URL` | **yes** | — | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | **yes** | — | Supabase service-role key (server only) |
-| `JWT_ACCESS_SECRET` | **yes** | — | Secret for signing access tokens. Generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
-| `JWT_ACCESS_EXPIRES_IN` | no | `15m` | Access-token lifetime (any `jsonwebtoken` expiresIn string) |
-| `JWT_REFRESH_EXPIRES_IN_DAYS` | no | `30` | Refresh-token lifetime in days |
-| `CORS_ORIGIN` | no | `http://localhost:5500` | Allowed browser origin (set to your Netlify URL in prod) |
+| `PORT` | No | `4000` | Port for the Express server to listen on |
+| `NODE_ENV` | No | `development` | Environment mode (`development` or `production`). Governs rate limiting enforcement. |
+| `SUPABASE_URL` | **Yes** | — | Your Supabase project URL (`https://xyz.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | — | Supabase `service_role` secret (server-only; bypasses RLS) |
+| `JWT_ACCESS_SECRET` | **Yes** | — | Cryptographic secret for signing access tokens |
+| `JWT_ACCESS_EXPIRES_IN` | No | `15m` | Lifetime of short-lived JWT access tokens |
+| `JWT_REFRESH_EXPIRES_IN_DAYS` | No | `30` | Duration (in days) before refresh tokens expire |
+| `CORS_ORIGIN` | No | `http://localhost:5500` | Allowed client origin for CORS headers |
+
+---
+
+## Deployment Guide
+
+### Backend (Render / Railway / Fly.io)
+
+1. Create a **Web Service** connected to your repository.
+2. Build Command: `npm install`
+3. Start Command: `npm start`
+4. Set the environment variables in the host dashboard (`NODE_ENV=production`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_ACCESS_SECRET`, `CORS_ORIGIN=https://your-frontend.netlify.app`).
+
+### Frontend (Netlify / Vercel / GitHub Pages)
+
+1. Create a static site connected to the repository.
+2. Publish Directory: `frontend`
+3. Build Command: *None*
+4. Ensure [`frontend/js/api.js`](frontend/js/api.js) points its `API_BASE_URL` to your production backend URL.
 
 ---
 
 ## Testing
 
-No test runner is installed. The suite in [`tests/`](tests/) is plain Node scripts with a tiny assertion framework, and it runs against an **in-memory Supabase mock** ([`tests/mockSupabase.js`](tests/mockSupabase.js)) injected via `require.cache` — the *real* services and controllers execute unchanged, so **no database is needed**. All randomness is seeded and time is injectable, so runs are deterministic and reproducible.
+Playwright is configured for browser-based end-to-end testing. Test configurations and reports are managed under `.playwright-cli/` (auto-generated by the Playwright CLI).
 
+To run tests (when test files are present):
 ```bash
-node tests/stress-time.js        # 19 assertions — 2 years × 4 timezones of DST-correct
-                                 #   day/week bounds, local midnights, range spans
-node tests/stress-habits.js      # 247 assertions — streak math vs an independent
-                                 #   spec reference (~2,300 randomized patterns),
-                                 #   52-week cap, missed-week resets
-node tests/stress-controllers.js # 64 assertions — a full simulated year driven through
-                                 #   the real controllers: habits, dashboard ranges,
-                                 #   calendar, reminders cron, bin purge, note conversion,
-                                 #   profile isolation, settings changes
-node tests/frontend-dst.js       # 146 assertions — the real frontend timeUtils.js vs the
-                                 #   backend on DST days, weeks, and months
+npx playwright test
 ```
 
-Run them all:
-
-```bash
-for f in tests/*.js; do node "$f"; done
-```
-
-**476 assertions, 0 failures** is the expected green state.
-
-> The mock mirrors Postgres semantics the code relies on (row defaults, unique-constraint `23505`, filter operators, `habits(...)` join) but is **not** Postgres — type-coercion behaviors (e.g. rejecting a non-date string) only show up against a real database.
+> **Note:** Tests require the backend running on `http://localhost:4000` and the frontend served on `http://localhost:5500`. Start both servers before running tests.
 
 ---
 
-## Deployment
+## API Reference
 
-The repo is designed for **backend on Render** + **frontend on Netlify**.
-
-**Backend (Render):**
-1. Create a new Web Service pointing at this repo.
-2. Set the environment variables (the same names as [above](#environment-variables)) in the Render dashboard — **no `.env` file on Render**.
-3. Start command: `npm start`. `CORS_ORIGIN` = your Netlify URL.
-
-**Frontend (Netlify):**
-1. Build command: *none* (static site), publish directory: `frontend/`.
-2. Update [`frontend/js/api.js`](frontend/js/api.js) `API_BASE_URL` to your Render URL.
+Detailed endpoint specifications, request payloads, and query parameters are documented in **[`api.md`](api.md)**.
 
 ---
 
-## API
+## License
 
-Full endpoint reference (auth, profiles, tasks, notes, habits, calendar, reminders, bin, settings, dashboard) lives in **[`api.md`](api.md)**.
-
-All routes except `/api/auth/*` and `/health` require an `Authorization: Bearer <accessToken>` header.
-
----
-
-## Known limitations & follow-ups
-
-From a year-long stress-test audit (see [Testing](#testing)); none are crashes, but worth knowing:
-
-- **No pagination** on list endpoints — tasks/notes/reminders/bin return everything (and done reminders accumulate). Fine at personal scale, slow at scale.
-- **`datetime-local` inputs** (tasks, reminders, calendar pages) capture *browser-local* wall time, while the backend interprets streaks and dashboard ranges in the *profile's* configured timezone. Set the two the same, or due/reminder times will be interpreted in the wrong zone.
-- **Habit streaks cap at 52 weeks** — a 100-week perfect streak reports 52 (the query window is deliberately bounded).
-- **Validation gaps** documented in the stress suite: an event `UPDATE` can set `ends_at < starts_at` (create validates, update doesn't), and habit-log dates aren't validated for format/future dates.
-- **`refresh_tokens` rows are never purged** — expired/revoked rows accumulate (harmless at single-user scale; a cleanup cron would be a reasonable addition).
+ISC License. Built as an open, personal productivity system.

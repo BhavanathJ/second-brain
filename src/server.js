@@ -32,7 +32,7 @@ const allowedOrigins = Array.isArray(config.corsOrigin)
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, file://, server-to-server)
-    if (!origin || origin === 'null') {
+    if (!origin) {
       return callback(null, true);
     }
 

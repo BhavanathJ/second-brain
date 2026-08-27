@@ -77,19 +77,19 @@ function getBrowserTimezone() {
 async function loadSettings() {
     const { settings } = await apiFetch('/settings');
 
-    // Auto-detect browser timezone on first visit if using default
-    // This helps users who didn't go through signup auto-detection
-    let displayTimezone = normalizeTimezone(settings.timezone);
-    if (displayTimezone === 'Asia/Kolkata') {
+    // Always use the saved timezone as the selected value
+    const savedTimezone = normalizeTimezone(settings.timezone);
+    populateTimezoneSelect(savedTimezone);
+    updateTimezoneOffsetDisplay(savedTimezone);
+
+    // If saved timezone is the default, check for browser detection
+    // and show a non-intrusive suggestion (user must explicitly accept)
+    if (savedTimezone === 'Asia/Kolkata') {
         const browserTZ = getBrowserTimezone();
         if (browserTZ && browserTZ !== 'Asia/Kolkata') {
-            displayTimezone = browserTZ;
+            showTimezoneSuggestion(browserTZ);
         }
     }
-
-    populateTimezoneSelect(displayTimezone);
-    // Initialize the offset display with current selection
-    updateTimezoneOffsetDisplay(displayTimezone);
 
     // Update offset display when user changes timezone selection
     document.getElementById('timezoneSelect').addEventListener('change', (e) => {
@@ -99,6 +99,30 @@ async function loadSettings() {
     const themeEl = document.getElementById('themeSelect');
     if (themeEl) themeEl.value = settings.theme;
     document.getElementById('weekStartSelect').value = String(settings.week_starts_on);
+}
+
+function showTimezoneSuggestion(detectedTimezone) {
+    const offsetStr = formatOffsetString(getOffsetMinutesValue(detectedTimezone));
+    const friendlyName = getTimezoneDisplayLabel(detectedTimezone, offsetStr);
+    const suggestionHtml = `
+        <div class="alert alert-info alert-dismissible fade show mt-2" role="alert" id="tzSuggestion">
+            <strong>Detected timezone:</strong> ${escapeHtml(friendlyName)}
+            <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="useDetectedTz">
+                Use this timezone
+            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+        </div>
+    `;
+    const form = document.getElementById('settingsForm');
+    form.insertAdjacentHTML('afterbegin', suggestionHtml);
+
+    document.getElementById('useDetectedTz').addEventListener('click', () => {
+        const select = document.getElementById('timezoneSelect');
+        select.value = detectedTimezone;
+        updateTimezoneOffsetDisplay(detectedTimezone);
+        const alert = document.getElementById('tzSuggestion');
+        if (alert) alert.remove();
+    });
 }
 
 function updateTimezoneOffsetDisplay(timezone) {

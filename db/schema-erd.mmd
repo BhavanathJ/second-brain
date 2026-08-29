@@ -18,10 +18,13 @@ erDiagram
   REMINDERS }o..o{ TASKS : "attaches to (entity_type/id, app-enforced)"
   REMINDERS }o..o{ HABITS : "attaches to (entity_type/id, app-enforced)"
   REMINDERS }o..o{ CALENDAR_EVENTS : "attaches to (entity_type/id, app-enforced)"
+  REMINDERS }o..o{ NOTES : "attaches to (entity_type/id, app-enforced)"
 
   BIN_ENTRIES }o..o{ TASKS : "logs delete (app-enforced)"
   BIN_ENTRIES }o..o{ NOTES : "logs delete (app-enforced)"
   BIN_ENTRIES }o..o{ HABITS : "logs delete (app-enforced)"
+  BIN_ENTRIES }o..o{ CALENDAR_EVENTS : "logs delete (app-enforced)"
+  BIN_ENTRIES }o..o{ REMINDERS : "logs delete (app-enforced)"
 
   USERS {
     uuid id PK
@@ -50,6 +53,7 @@ erDiagram
     text timezone
     text theme
     smallint week_starts_on
+    text design_system
     timestamptz updated_at
   }
   TASKS {
@@ -69,7 +73,7 @@ erDiagram
     uuid id PK
     uuid profile_id FK
     text content
-    text tags
+    text[] tags
     uuid converted_task_id FK
     timestamptz deleted_at
     timestamptz created_at
@@ -82,6 +86,7 @@ erDiagram
     smallint target_per_week
     timestamptz deleted_at
     timestamptz created_at
+    timestamptz updated_at
   }
   HABIT_LOGS {
     uuid id PK
@@ -100,6 +105,7 @@ erDiagram
     text location
     timestamptz deleted_at
     timestamptz created_at
+    timestamptz updated_at
   }
   REMINDERS {
     uuid id PK
@@ -111,6 +117,7 @@ erDiagram
     boolean is_done
     timestamptz deleted_at
     timestamptz created_at
+    timestamptz updated_at
   }
   BIN_ENTRIES {
     uuid id PK

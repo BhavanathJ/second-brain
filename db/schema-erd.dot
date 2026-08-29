@@ -42,6 +42,7 @@ digraph SecondBrainSchema {
       <tr><td align="left">timezone</td></tr>
       <tr><td align="left">theme</td></tr>
       <tr><td align="left">week_starts_on</td></tr>
+      <tr><td align="left">design_system</td></tr>
       <tr><td align="left">updated_at</td></tr>
     </table>>];
 
@@ -79,7 +80,7 @@ digraph SecondBrainSchema {
       <tr><td align="left">title</td></tr>
       <tr><td align="left">target_per_week</td></tr>
       <tr><td align="left">deleted_at</td></tr>
-      <tr><td align="left">created_at</td></tr>
+      <tr><td align="left">created_at / updated_at</td></tr>
     </table>>];
 
   habit_logs [label=<
@@ -102,7 +103,7 @@ digraph SecondBrainSchema {
       <tr><td align="left">starts_at / ends_at</td></tr>
       <tr><td align="left">location</td></tr>
       <tr><td align="left">deleted_at</td></tr>
-      <tr><td align="left">created_at</td></tr>
+      <tr><td align="left">created_at / updated_at</td></tr>
     </table>>];
 
   reminders [label=<
@@ -114,7 +115,7 @@ digraph SecondBrainSchema {
       <tr><td align="left">entity_type / entity_id*</td></tr>
       <tr><td align="left">is_done</td></tr>
       <tr><td align="left">deleted_at</td></tr>
-      <tr><td align="left">created_at</td></tr>
+      <tr><td align="left">created_at / updated_at</td></tr>
     </table>>];
 
   bin_entries [label=<
@@ -142,7 +143,10 @@ digraph SecondBrainSchema {
   reminders -> tasks [label="*app-enforced\n(not real FK)" style=dotted color="#993C1D"];
   reminders -> habits [style=dotted color="#993C1D"];
   reminders -> calendar_events [style=dotted color="#993C1D"];
+  reminders -> notes [style=dotted color="#993C1D"];
   bin_entries -> tasks [label="*app-enforced\n(not real FK)" style=dotted color="#5F5E5A"];
   bin_entries -> notes [style=dotted color="#5F5E5A"];
   bin_entries -> habits [style=dotted color="#5F5E5A"];
+  bin_entries -> calendar_events [style=dotted color="#5F5E5A"];
+  bin_entries -> reminders [style=dotted color="#5F5E5A"];
 }

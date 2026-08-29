@@ -35,10 +35,17 @@ const DEFAULTS = {
 };
 
 // [col, col] composite keys. id is implicitly unique everywhere.
+// For case-insensitive unique constraints (like LOWER(username)), we track
+// the column name and a 'ci' (case-insensitive) flag in a separate map.
 const UNIQUES = {
   users: [['email']],
   settings: [['profile_id']],
   habit_logs: [['habit_id', 'log_date']],
+};
+
+// Case-insensitive unique constraints: table -> column name
+const CI_UNIQUES = {
+  users: ['username'],
 };
 
 class Query {
@@ -87,8 +94,17 @@ class Query {
   _matches(row) {
     for (const f of this.filters) {
       const actual = row[f.col];
+      // Case-insensitive matching for username on users table (mimics ILIKE / LOWER() index)
+      const isCiUsername = this.table === 'users' && f.col === 'username' && f.op === 'eq';
       switch (f.op) {
-        case 'eq': if (actual !== f.val) return false; break;
+        case 'eq':
+          if (isCiUsername) {
+            if (actual === undefined || actual === null) return false;
+            if (String(actual).toLowerCase() !== String(f.val).toLowerCase()) return false;
+          } else {
+            if (actual !== f.val) return false;
+          }
+          break;
         case 'is':
           if (f.val === null) { if (actual !== null && actual !== undefined) return false; }
           else if (f.val === true || f.val === false) { if (actual !== f.val) return false; }
@@ -135,6 +151,7 @@ class Query {
   }
 
   _uniqueViolation(row) {
+    // Check regular unique constraints
     const checks = UNIQUES[this.table] || [];
     for (const key of checks) {
       const hits = this.db[this.table].some(existing =>
@@ -146,6 +163,26 @@ class Query {
         return err;
       }
     }
+
+    // Check case-insensitive unique constraints (e.g., LOWER(username))
+    const ciChecks = CI_UNIQUES[this.table] || [];
+    for (const col of ciChecks) {
+      const rowVal = row[col];
+      if (rowVal !== undefined && rowVal !== null) {
+        const lowerVal = String(rowVal).toLowerCase();
+        const hits = this.db[this.table].some(existing => {
+          const existingVal = existing[col];
+          return existingVal !== undefined && existingVal !== null &&
+                 String(existingVal).toLowerCase() === lowerVal;
+        });
+        if (hits) {
+          const err = new Error(`duplicate key value violates unique constraint "${this.table}_${col}_lower_idx"`);
+          err.code = '23505';
+          return err;
+        }
+      }
+    }
+
     return null;
   }
 

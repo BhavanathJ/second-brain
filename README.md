@@ -10,14 +10,14 @@ The **backend** is an Express 4 REST API built on Node.js with direct **Supabase
 
 | Feature | Description |
 |---|---|
-| **Auth & Multi-Profile** | Secure email/password authentication with `bcryptjs`, JWT access tokens (15m) + refresh token rotation (30d), and password change. Supports up to **5 isolated profiles** per account with instant profile switching. |
+| **Auth & Multi-Profile** | Secure email/password authentication with `bcryptjs`, optional unique username, JWT access tokens (15m) + refresh token rotation (30d), and password change. Unlimited isolated profiles per account with instant profile switching. |
 | **Eisenhower Tasks Matrix** | Organize tasks by urgency and importance (Do First, Schedule, Delegate, Don't Do). Tasks with a `due_at` timestamp seamlessly sync with the calendar and dashboard. |
 | **Notes & Task Conversion** | Rich markdown/text capture with flexible multi-tag filtering. **One-click conversion** links notes to tasks with pointer references (avoids data duplication and race conditions). |
 | **Habit Tracking & Streaks** | Flexible weekly quota model (`target_per_week`, e.g., 7 = daily, 3 = 3×/week). Streaks and weekly completions are **dynamically computed** from raw daily logs across a 52-week window (zero drift). |
 | **Unified Calendar** | Combined day, week, and month views displaying tasks with due dates, habit completions, standalone calendar events, and scheduled reminders. Fully DST and timezone-aware. |
 | **Automated Reminders** | Set standalone reminders or attach them to tasks, habits, notes, or calendar events. A background cron job checks and triggers due reminders every minute. |
 | **Recycle Bin (30-Day Auto-Purge)** | Universal soft-delete system across all entities. Restore items or permanently delete them. A midnight cron job automatically purges items older than 30 days. |
-| **Profile Settings** | Per-profile IANA timezone selection, theme preferences (light/dark/system), and customizable first day of the week (Sunday vs. Monday). |
+| **Profile Settings** | Per-profile IANA timezone selection (with legacy timezone-name normalization), theme preferences (light/dark/system), a switchable design system (**Signal** — minimal grayscale, or **Neobrutalism** — bold colors and tactile shadows), and customizable first day of the week (Sunday vs. Monday). |
 | **Dashboard** | Instant summary of tasks categorized into *Today*, *Tomorrow*, *Next 7 Days*, and *Overdue* relative to the profile's local midnight. |
 | **Rate Limiting & Security** | Granular endpoint protection using `express-rate-limit` (login, signup, refresh, password change, global API) with automatic development bypass and reverse-proxy support. |
 
@@ -81,7 +81,8 @@ The **backend** is an Express 4 REST API built on Node.js with direct **Supabase
 │   │   ├── confirmDialog.js    # Modal confirmation helpers
 │   │   └── pages/              # Page-specific frontend controllers
 │   └── css/
-│       └── app.css             # Main styling, design tokens, and components
+│       ├── app.css             # Signal design system: styling, tokens, components
+│       └── neo.css             # Neobrutalism design system, scoped under [data-design="neo"]
 ├── api.md                      # Comprehensive API route and schema reference
 └── package.json
 ```
@@ -248,9 +249,20 @@ The project has been **thoroughly validated** using a deterministic, in-memory t
 - **Real code paths**: Actual services and controllers execute unchanged — only the DB layer is swapped
 - **CI-ready**: Runs in seconds with `node tests/stress-*.js` (no test runner needed)
 
-The test suite validated core business logic (timezone math, streak computation, controller flows). For browser-based E2E testing, Playwright is configured — run `npx playwright test` with both servers running (`http://localhost:4000` backend, `http://localhost:5500` frontend).
+The test suite validates core business logic (timezone math, streak computation, controller flows). There is currently no browser-based end-to-end test suite (e.g. Playwright/Cypress) — manual testing against a running backend + frontend via Postman/browser is the current process for UI-level flows.
 
 ---
+
+## Roadmap / Not Yet Implemented
+
+### Redis caching
+The dashboard aggregation endpoint (11 parallel Supabase queries) is a real cache-aside candidate, scoped and designed, but not yet implemented. Deferred until the app is deployed and there's a live environment to measure against.
+
+### Deployment
+Render (backend) + Netlify (frontend) + separate dev/prod Supabase projects are the target, but deployment is deliberately deferred until the feature set above is stable.
+
+### Browser-based E2E tests
+See Testing section above.
 
 ## API Reference
 

@@ -2,6 +2,7 @@ const profileService = require('../services/profileService');
 const settingsService = require('../services/settingsService');
 const { issueTokenPair } = require('./authController');
 const authService = require('../services/authService');
+const { normalizeTimezone, isValidTimezone } = require('../utils/timezone');
 
 async function listProfiles(req, res) {
     try {
@@ -24,11 +25,8 @@ async function createProfile(req, res) {
 
     // Validate timezone if provided
     let validatedTimezone = null;
-    if (timezone) {
-        const validTimezones = new Set(Intl.supportedValuesOf('timeZone'));
-        if (validTimezones.has(timezone)) {
-            validatedTimezone = timezone;
-        }
+    if (timezone && isValidTimezone(timezone)) {
+        validatedTimezone = normalizeTimezone(timezone);
     }
 
     try {

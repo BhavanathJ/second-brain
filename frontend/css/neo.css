@@ -66,20 +66,20 @@
 }
 
 [data-design="neo"][data-theme="dark"] {
-    /* Base Palette (Dark Mode) */
-    --sb-bg: #121214;
-    --sb-surface: #1C1C20;
-    --sb-surface-alt: #26262C;
-    --sb-ink: #F8F8FA;
-    --sb-muted: #9E9EAA;
-    --sb-border: #E8E8EE;
-    --sb-border-light: #34343E;
+    /* Base Palette (Dark Mode) - warmer, less harsh */
+    --sb-bg: #1A1A1E;
+    --sb-surface: #222228;
+    --sb-surface-alt: #2C2C34;
+    --sb-ink: #F5F5F7;
+    --sb-muted: #A0A0B0;
+    --sb-border: #3A3A46;
+    --sb-border-light: #2E2E38;
     --sb-shadow-color: #000000;
 
-    /* Neo Accents (Dark Mode) */
-    --sb-primary: #FFE600;
-    --sb-primary-hover: #FFF052;
-    --sb-primary-ink: #121212;
+    /* Neo Accents (Dark Mode) - shifted to warmer/cyan primary, yellow as accent */
+    --sb-primary: #38BDF8;        /* Cyan primary - easier on eyes in dark */
+    --sb-primary-hover: #7DD3FC;
+    --sb-primary-ink: #0C1A24;
 
     --sb-alert: #FF6666;
     --sb-alert-hover: #FF7D7D;
@@ -103,6 +103,9 @@
 
     --sb-accent-pink: #F472B6;
     --sb-accent-pink-surface: #441B2D;
+
+    --sb-accent-yellow: #FFE600;   /* Yellow as accent, not primary */
+    --sb-accent-yellow-surface: #3D3800;
 
     --sb-shadow-sm: 2px 2px 0px var(--sb-shadow-color);
     --sb-shadow: 4px 4px 0px var(--sb-shadow-color);

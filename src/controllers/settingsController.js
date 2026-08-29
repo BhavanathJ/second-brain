@@ -3,6 +3,41 @@ const settingsService = require('../services/settingsService');
 const VALID_THEMES = ['light', 'dark', 'system'];
 const VALID_WEEK_STARTS = [0, 1]; // 0 = Sunday, 1 = Monday
 const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'));
+const VALID_DESIGN_SYSTEMS = ['signal', 'neo'];
+
+// Legacy timezone aliases (modern -> legacy for Node.js ICU)
+const MODERN_TO_LEGACY = {
+  'Asia/Kolkata': 'Asia/Calcutta',
+  'Europe/Kyiv': 'Europe/Kiev',
+  'Asia/Ho_Chi_Minh': 'Asia/Saigon',
+  'Asia/Kathmandu': 'Asia/Katmandu',
+  'Asia/Yangon': 'Asia/Rangoon',
+};
+
+// Legacy timezone aliases (legacy -> modern for storage)
+const LEGACY_TO_MODERN = {
+  'Asia/Calcutta': 'Asia/Kolkata',
+  'Europe/Kiev': 'Europe/Kyiv',
+  'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+  'Asia/Katmandu': 'Asia/Kathmandu',
+  'Asia/Rangoon': 'Asia/Yangon',
+};
+
+// Normalize to modern canonical IANA timezone identifier (for storage)
+function normalizeTimezone(tz) {
+  if (!tz) return 'UTC';
+  return LEGACY_TO_MODERN[tz] || tz;
+}
+
+// Check if a timezone is valid (accepts both modern and legacy names)
+function isValidTimezone(tz) {
+  if (!tz || typeof tz !== 'string') return false;
+  const modern = normalizeTimezone(tz);
+  // Check modern name, legacy equivalent, or direct match
+  return VALID_TIMEZONES.has(modern) ||
+         VALID_TIMEZONES.has(MODERN_TO_LEGACY[modern]) ||
+         VALID_TIMEZONES.has(tz);
+}
 
 async function getSettings(req, res) {
     try {
@@ -18,7 +53,7 @@ async function getSettings(req, res) {
 }
 
 async function updateSettings(req, res) {
-    const allowedFields = ['timezone', 'theme', 'week_starts_on'];
+    const allowedFields = ['timezone', 'theme', 'week_starts_on', 'design_system'];
     const fields = {};
 
     for (const key of allowedFields) {
@@ -40,8 +75,15 @@ async function updateSettings(req, res) {
         return res.status(400).json({ error: 'Invalid week_starts_on. Must be 0 (Sunday) or 1 (Monday).' });
     }
     if (fields.timezone !== undefined) {
-        if (!fields.timezone || typeof fields.timezone !== 'string' || !VALID_TIMEZONES.has(fields.timezone)) {
+        if (!isValidTimezone(fields.timezone)) {
             return res.status(400).json({ error: 'Invalid timezone. Must be a valid IANA timezone name (e.g. "Asia/Kolkata").' });
+        }
+        // Store the normalized (modern) version
+        fields.timezone = normalizeTimezone(fields.timezone);
+    }
+    if (fields.design_system !== undefined) {
+        if (!fields.design_system || typeof fields.design_system !== 'string' || !VALID_DESIGN_SYSTEMS.includes(fields.design_system)) {
+            return res.status(400).json({ error: `Invalid design_system. Must be one of: ${VALID_DESIGN_SYSTEMS.join(', ')}.` });
         }
     }
 

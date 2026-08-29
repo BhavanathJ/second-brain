@@ -7,6 +7,42 @@ const config = require('../config/env');
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
 
+// Legacy timezone aliases (modern -> legacy for Node.js ICU)
+const MODERN_TO_LEGACY = {
+  'Asia/Kolkata': 'Asia/Calcutta',
+  'Europe/Kyiv': 'Europe/Kiev',
+  'Asia/Ho_Chi_Minh': 'Asia/Saigon',
+  'Asia/Kathmandu': 'Asia/Katmandu',
+  'Asia/Yangon': 'Asia/Rangoon',
+};
+
+// Legacy timezone aliases (legacy -> modern for storage)
+const LEGACY_TO_MODERN = {
+  'Asia/Calcutta': 'Asia/Kolkata',
+  'Europe/Kiev': 'Europe/Kyiv',
+  'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+  'Asia/Katmandu': 'Asia/Kathmandu',
+  'Asia/Rangoon': 'Asia/Yangon',
+};
+
+const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'));
+
+// Normalize to modern canonical IANA timezone identifier (for storage)
+function normalizeTimezone(tz) {
+  if (!tz) return 'UTC';
+  return LEGACY_TO_MODERN[tz] || tz;
+}
+
+// Check if a timezone is valid (accepts both modern and legacy names)
+function isValidTimezone(tz) {
+  if (!tz || typeof tz !== 'string') return false;
+  const modern = normalizeTimezone(tz);
+  // Check modern name, legacy equivalent, or direct match
+  return VALID_TIMEZONES.has(modern) ||
+         VALID_TIMEZONES.has(MODERN_TO_LEGACY[modern]) ||
+         VALID_TIMEZONES.has(tz);
+}
+
 async function issueTokenPair({ userId, profileId, username }) {
   const accessToken = signAccessToken({ userId, profileId, username });
 
@@ -38,8 +74,9 @@ async function signup(req, res) {
   let validatedTimezone = null;
   if (timezone) {
     const validTimezones = new Set(Intl.supportedValuesOf('timeZone'));
-    if (validTimezones.has(timezone)) {
-      validatedTimezone = timezone;
+    const normalizedTz = normalizeTimezone(timezone);
+    if (validTimezones.has(normalizedTz) || validTimezones.has(timezone)) {
+      validatedTimezone = normalizedTz;
     }
     // If invalid, we'll just use the DB default (Asia/Kolkata)
   }

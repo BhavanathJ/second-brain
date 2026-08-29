@@ -56,6 +56,7 @@ CREATE TABLE settings (
   timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
   theme TEXT NOT NULL DEFAULT 'light',
   week_starts_on SMALLINT NOT NULL DEFAULT 0, -- 0=Sunday, 1=Monday (locked: Sunday)
+  design_system TEXT NOT NULL DEFAULT 'signal', -- 'signal' | 'neo'
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

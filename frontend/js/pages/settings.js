@@ -99,6 +99,7 @@ async function loadSettings() {
     const themeEl = document.getElementById('themeSelect');
     if (themeEl) themeEl.value = settings.theme;
     document.getElementById('weekStartSelect').value = String(settings.week_starts_on);
+    document.getElementById('designSystemSelect').value = settings.design_system || 'signal';
 }
 
 function showTimezoneSuggestion(detectedTimezone) {
@@ -171,6 +172,7 @@ async function handleSubmit(e) {
     const payload = {
         timezone: document.getElementById('timezoneSelect').value,
         week_starts_on: Number(document.getElementById('weekStartSelect').value),
+        design_system: document.getElementById('designSystemSelect').value,
     };
     if (themeEl) {
         payload.theme = themeEl.value;
@@ -185,6 +187,9 @@ async function handleSubmit(e) {
         // The RAW pref is still cached in localStorage for pre-paint theme reads.
         document.documentElement.setAttribute('data-theme', resolveTheme(payload.theme));
         localStorage.setItem('theme', payload.theme);
+        // Also persist and apply design system
+        document.documentElement.setAttribute('data-design', payload.design_system);
+        localStorage.setItem('design_system', payload.design_system);
 
         const msg = document.getElementById('saveMsg');
         msg.classList.add('visible');

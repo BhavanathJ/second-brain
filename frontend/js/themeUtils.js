@@ -23,3 +23,14 @@ export function watchSystemTheme(callback) {
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
 }
+
+// Updates the favicon based on the resolved theme ('light' | 'dark').
+// This is called whenever the theme changes so the icon switches
+// instantly without a page reload.
+export function updateFavicon(resolvedTheme) {
+    // Update existing favicon link by ID (created in pre-paint script)
+    const favicon = document.getElementById('favicon');
+    if (favicon) {
+        favicon.href = resolvedTheme === 'dark' ? '../favicon-dark.svg' : '../favicon.svg';
+    }
+}

@@ -5,6 +5,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard — Second Brain</title>
+    <!-- Default favicon (light) — updated by pre-paint script before first paint -->
+    <link id="favicon" rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <script>
         (function () {
             var pref = localStorage.getItem('theme') || 'system';
@@ -14,6 +16,9 @@
             document.documentElement.setAttribute('data-theme', resolved);
             var design = localStorage.getItem('design_system') || 'signal';
             document.documentElement.setAttribute('data-design', design);
+            // Update favicon href before first paint to match resolved theme
+            var favicon = document.getElementById('favicon');
+            if (favicon) favicon.href = resolved === 'dark' ? '../favicon-dark.svg' : '../favicon.svg';
         })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,7 +27,6 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="../css/app.css" rel="stylesheet" />
     <link href="../css/neo.css" rel="stylesheet" />
-    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
 </head>
 
 <body>

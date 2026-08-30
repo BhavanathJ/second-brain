@@ -1,6 +1,6 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
-import { resolveTheme, watchSystemTheme } from './themeUtils.js';
+import { resolveTheme, watchSystemTheme, updateFavicon } from './themeUtils.js';
 import { escapeHtml } from './utils.js';
 
 const NAV_ITEMS = [
@@ -103,6 +103,7 @@ function applyResolvedTheme(rawPref) {
     const resolved = resolveTheme(rawPref);
     document.documentElement.setAttribute('data-theme', resolved);
     localStorage.setItem('theme', rawPref);
+    updateFavicon(resolved);
 }
 
 let stopWatchingSystemTheme = null;

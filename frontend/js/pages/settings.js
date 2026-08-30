@@ -1,7 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
-import { resolveTheme } from '../themeUtils.js';
+import { resolveTheme, updateFavicon } from '../themeUtils.js';
 import { getOffsetMinutes } from '../timeUtils.js';
 import { getTimezoneDisplayLabel, normalizeTimezone } from '../timezoneNames.js';
 
@@ -185,8 +185,10 @@ async function handleSubmit(e) {
         // before writing data-theme — CSS only matches "light"/"dark", so
         // writing "system" raw would fall back to the default until reload.
         // The RAW pref is still cached in localStorage for pre-paint theme reads.
-        document.documentElement.setAttribute('data-theme', resolveTheme(payload.theme));
+        const resolvedTheme = resolveTheme(payload.theme);
+        document.documentElement.setAttribute('data-theme', resolvedTheme);
         localStorage.setItem('theme', payload.theme);
+        updateFavicon(resolvedTheme);
         // Also persist and apply design system
         document.documentElement.setAttribute('data-design', payload.design_system);
         localStorage.setItem('design_system', payload.design_system);

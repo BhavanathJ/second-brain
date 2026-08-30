@@ -1,4 +1,5 @@
 import { apiFetch } from './api.js';
+import { updateFavicon } from './themeUtils.js';
 
 // --- Pre-login theme selector (localStorage only — no /settings to fetch from yet) ---
 const themeSelect = document.getElementById('preLoginThemeSelect');
@@ -11,6 +12,8 @@ themeSelect.addEventListener('change', () => {
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : pref;
     document.documentElement.setAttribute('data-theme', resolved);
+    updateFavicon(resolved);
+    updateFavicon(resolved);
 });
 
 // --- Show/hide password toggles — works for any field via data-target ---

@@ -1,6 +1,6 @@
 const profileService = require('../services/profileService');
 const settingsService = require('../services/settingsService');
-const { issueTokenPair } = require('./authController');
+const { issueTokenPair, revokeRefreshTokenByRaw } = require('./authController');
 const authService = require('../services/authService');
 const { normalizeTimezone, isValidTimezone } = require('../utils/timezone');
 
@@ -49,10 +49,18 @@ async function createProfile(req, res) {
 }
 
 async function selectProfile(req, res) {
+    const { refreshToken: oldRefreshToken } = req.body;
     try {
         const profile = await profileService.findProfileForUser(req.userId, req.params.id);
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found.' });
+        }
+
+        // Revoke the session's current refresh token before issuing a new one —
+        // otherwise switching profiles N times leaves N live, unrevoked
+        // refresh_tokens rows for the same device, each one still valid.
+        if (oldRefreshToken) {
+            await revokeRefreshTokenByRaw(oldRefreshToken);
         }
 
         const user = await authService.findUserById(req.userId);

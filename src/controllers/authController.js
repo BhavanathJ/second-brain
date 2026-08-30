@@ -203,4 +203,9 @@ async function changePassword(req, res) {
   }
 }
 
-module.exports = { signup, login, refresh, logout, changePassword, issueTokenPair };
+async function revokeRefreshTokenByRaw(rawRefreshToken) {
+  const tokenHash = hashRefreshToken(rawRefreshToken);
+  await authService.revokeRefreshToken(tokenHash);
+}
+
+module.exports = { signup, login, refresh, logout, changePassword, issueTokenPair, revokeRefreshTokenByRaw };

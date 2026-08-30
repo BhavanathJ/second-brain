@@ -27,10 +27,12 @@ export function watchSystemTheme(callback) {
 // Updates the favicon based on the resolved theme ('light' | 'dark').
 // This is called whenever the theme changes so the icon switches
 // instantly without a page reload.
-export function updateFavicon(resolvedTheme) {
+// basePath must match how this page already links its own favicon:
+// '' for frontend/index.html (root), '../' for anything under frontend/pages/.
+export function updateFavicon(resolvedTheme, basePath = '../') {
     // Update existing favicon link by ID (created in pre-paint script)
     const favicon = document.getElementById('favicon');
     if (favicon) {
-        favicon.href = resolvedTheme === 'dark' ? '../favicon-dark.svg' : '../favicon.svg';
+        favicon.href = resolvedTheme === 'dark' ? `${basePath}favicon-dark.svg` : `${basePath}favicon.svg`;
     }
 }

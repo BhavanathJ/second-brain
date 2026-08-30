@@ -1,6 +1,6 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
-import { resolveTheme, watchSystemTheme, updateFavicon } from './themeUtils.js';
+import { resolveTheme, watchSystemTheme } from './themeUtils.js';
 import { escapeHtml } from './utils.js';
 
 const NAV_ITEMS = [
@@ -85,7 +85,11 @@ async function populateProfileSwitcher(currentProfileId) {
         if (newProfileId === currentProfileId) return;
 
         try {
-            const data = await apiFetch(`/profiles/${newProfileId}/select`, { method: 'POST' });
+            const currentRefreshToken = localStorage.getItem('refreshToken');
+            const data = await apiFetch(`/profiles/${newProfileId}/select`, {
+                method: 'POST',
+                body: JSON.stringify({ refreshToken: currentRefreshToken }),
+            });
             localStorage.setItem('accessToken', data.accessToken);
             localStorage.setItem('refreshToken', data.refreshToken);
             window.location.reload();
@@ -103,7 +107,6 @@ function applyResolvedTheme(rawPref) {
     const resolved = resolveTheme(rawPref);
     document.documentElement.setAttribute('data-theme', resolved);
     localStorage.setItem('theme', rawPref);
-    updateFavicon(resolved);
 }
 
 let stopWatchingSystemTheme = null;

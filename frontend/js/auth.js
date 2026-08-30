@@ -12,8 +12,9 @@ themeSelect.addEventListener('change', () => {
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : pref;
     document.documentElement.setAttribute('data-theme', resolved);
-    updateFavicon(resolved);
-    updateFavicon(resolved);
+    // auth.js only loads on frontend/index.html (root level), so basePath
+    // must be '' — the shared default of '../' is for pages/ subdirectory.
+    updateFavicon(resolved, '');
 });
 
 // --- Show/hide password toggles — works for any field via data-target ---

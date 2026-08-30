@@ -105,11 +105,15 @@ async function getAuthToken(userId, profileId, username) {
   // ================= RESTORE PURGED ENTRY =================
   section('Restore purged entry: returns clean 404');
 
-  // 8. Create a bin entry with auto_purge_at in the past (already purged)
+  // 8. Create a bin entry with auto_purge_at in the past, then run the REAL
+  // purge cron logic to actually remove it — setting the timestamp alone
+  // does nothing; purging only happens when this function runs, exactly as
+  // it does on a schedule in production (see server.js).
   const purgedTask = mock.seed('tasks', { profile_id: profile.id, title: 'Purged task', status: 'pending', deleted_at: '2026-01-01T00:00:00Z' });
   const purgedBin = mock.seed('bin_entries', { profile_id: profile.id, entity_type: 'task', entity_id: purgedTask.id, auto_purge_at: '2025-01-01T00:00:00Z' });
+  await binController.purgeExpiredEntries();
 
-  // 9. Try to restore the purged entry
+  // 9. Try to restore the now-actually-purged entry
   {
     const r = await call(binController.restoreEntry, { profileId: profile.id, params: { id: purgedBin.id } });
     check(r.status === 404, 'restore purged entry → 404', `got ${r.status}`);

@@ -23,7 +23,8 @@ async function issueTokenPair({ userId, profileId, username }) {
 }
 
 async function signup(req, res) {
-  const { email, username, password, timezone } = req.body;
+  const { email: rawEmail, username, password, timezone } = req.body;
+  const email = rawEmail?.toLowerCase().trim();
 
   if (!email || !username || !password) {
     return res.status(400).json({ error: 'Email, username, and password are required.' });
@@ -74,7 +75,8 @@ async function signup(req, res) {
 }
 
 async function login(req, res) {
-  const { email, password } = req.body;
+  const { email: rawEmail, password } = req.body;
+  const email = rawEmail?.toLowerCase().trim();
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });

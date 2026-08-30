@@ -14,7 +14,7 @@ const NOW = () => new Date().toISOString();
 const DEFAULTS = {
   users: {},
   profiles: { created_at: NOW },
-  refresh_tokens: {},
+  refresh_tokens: { revoked_at: () => null },
   settings: { timezone: () => 'Asia/Kolkata', theme: () => 'light', week_starts_on: () => 0, updated_at: NOW },
   tasks: {
     status: () => 'pending', urgent: () => false, important: () => false,
@@ -44,9 +44,46 @@ const UNIQUES = {
 };
 
 // Case-insensitive unique constraints: table -> column name
+// Mirrors every `REFERENCES ... ON DELETE CASCADE` in db/schema.sql.
+// Each entry: child table -> { column: parent's FK column, parent: parent table }.
+// When a parent row is deleted, the mock recursively deletes matching child
+// rows, the same way Postgres does at the constraint level. This lets tests
+// verify cascade-delete behavior without needing a real database.
+const CASCADE_FKS = [
+  { child: 'profiles', column: 'user_id', parent: 'users' },
+  { child: 'refresh_tokens', column: 'user_id', parent: 'users' },
+  { child: 'refresh_tokens', column: 'profile_id', parent: 'profiles' },
+  { child: 'settings', column: 'profile_id', parent: 'profiles' },
+  { child: 'tasks', column: 'profile_id', parent: 'profiles' },
+  { child: 'notes', column: 'profile_id', parent: 'profiles' },
+  { child: 'habits', column: 'profile_id', parent: 'profiles' },
+  { child: 'habit_logs', column: 'profile_id', parent: 'profiles' },
+  { child: 'habit_logs', column: 'habit_id', parent: 'habits' },
+  { child: 'calendar_events', column: 'profile_id', parent: 'profiles' },
+  { child: 'reminders', column: 'profile_id', parent: 'profiles' },
+  { child: 'bin_entries', column: 'profile_id', parent: 'profiles' },
+];
+
 const CI_UNIQUES = {
   users: ['username'],
 };
+
+// Given a deleted parent row's id, recursively removes every dependent row
+// across all tables per CASCADE_FKS, mirroring Postgres ON DELETE CASCADE.
+// Recursion handles transitive cascades (e.g. deleting a profile deletes its
+// habits, which in turn deletes those habits' habit_logs).
+function cascadeDelete(db, parentTable, parentId) {
+  const dependents = CASCADE_FKS.filter(fk => fk.parent === parentTable);
+  for (const fk of dependents) {
+    const rows = db[fk.child] || [];
+    const toRemove = rows.filter(r => r[fk.column] === parentId);
+    for (const row of toRemove) {
+      const idx = rows.indexOf(row);
+      if (idx !== -1) rows.splice(idx, 1);
+      cascadeDelete(db, fk.child, row.id);
+    }
+  }
+}
 
 class Query {
   constructor(db, table) {
@@ -221,6 +258,7 @@ class Query {
       for (const r of matches) {
         const idx = this.db[this.table].indexOf(r);
         if (idx !== -1) this.db[this.table].splice(idx, 1);
+        cascadeDelete(this.db, this.table, r.id);
       }
       if (this.mode === 'maybeSingle' || this.mode === 'single') {
         return { data: removed.length ? this._project(removed[0]) : null, error: null };

@@ -20,7 +20,9 @@ async function call(fn, overrides) {
 
 async function seedUser(email, username, password, timezone) {
   const passwordHash = await hashPassword(password);
-  const user = mock.seed('users', { email, username, password_hash: passwordHash });
+  // Real signup always lowercases email before storing (see authController.js).
+  // Normalize here too, so seeded test data matches that real invariant.
+  const user = mock.seed('users', { email: email.toLowerCase(), username, password_hash: passwordHash });
   const profile = mock.seed('profiles', { user_id: user.id, name: 'Main' });
   await settingsService.createDefaultSettings(profile.id, timezone);
   return { user, profile, passwordHash };
@@ -30,7 +32,7 @@ async function seedUser(email, username, password, timezone) {
   // ================= SIGNUP =================
   section('Signup: duplicate email/username casing, underscore collision, legacy timezone');
 
-  // 1. Duplicate email with SAME casing - rejected (emails are case-sensitive unique in DB)
+  // 1. Duplicate email with SAME casing - rejected (emails are unique, case-insensitively)
   {
     await seedUser('user@example.com', 'userone', 'password123', 'Asia/Kolkata');
     const r = await call(authController.signup, { body: { email: 'user@example.com', username: 'userTwo', password: 'password123' } });
@@ -38,12 +40,13 @@ async function seedUser(email, username, password, timezone) {
     check(r.body && r.body.error && r.body.error.includes('email'), 'error mentions email');
   }
 
-  // 2. Duplicate email with different casing - creates new account (email is case-sensitive unique)
-  // Use a different email base to avoid conflicts with test 1
+  // 2. Duplicate email with DIFFERENT casing - also rejected (email uniqueness
+  // is case-insensitive: authController lowercases input before checking,
+  // and findUserByEmail/createUser both lowercase before their DB calls)
   {
-    await seedUser('User@Example.com', 'userone2', 'password123', 'Asia/Kolkata');
-    const r = await call(authController.signup, { body: { email: 'user2@example.com', username: 'userTwo2', password: 'password123' } });
-    check(r.status === 201, 'signup: different email → 201', `got ${r.status}`);
+    await seedUser('CaseEmail@Example.com', 'userone2', 'password123', 'Asia/Kolkata');
+    const r = await call(authController.signup, { body: { email: 'caseemail@EXAMPLE.com', username: 'userTwo2', password: 'password123' } });
+    check(r.status === 409, 'signup: duplicate email different casing → 409', `got ${r.status}`);
   }
 
   // 3. Duplicate username with different casing - rejected (username is case-insensitive unique)
@@ -79,7 +82,7 @@ async function seedUser(email, username, password, timezone) {
   }
 
   // ================= LOGIN =================
-  section('Login: wrong password, non-existent email, email lookup is case-sensitive');
+  section('Login: wrong password, non-existent email, email lookup is case-insensitive');
 
   // 7. Wrong password rejected
   {
@@ -94,12 +97,15 @@ async function seedUser(email, username, password, timezone) {
     check(r.status === 401, 'login: non-existent email → 401', `got ${r.status}`);
   }
 
-  // 9. Email lookup is case-sensitive (matching DB behavior)
-  // The authService.findUserByEmail uses exact match (no .toLowerCase())
+  // 9. Email lookup is case-insensitive (authController lowercases the input
+  // before lookup, and findUserByEmail also lowercases before its .eq() check)
   {
-    await seedUser('User@Example.COM', 'caseuser', 'password123', 'Asia/Kolkata');
-    const r = await call(authController.login, { body: { email: 'user@example.com', password: 'password123' } });
-    check(r.status === 401, 'login: different casing email → 401 (exact match)', `got ${r.status}`);
+    await seedUser('CaseLogin@Example.COM', 'caseuser', 'password123', 'Asia/Kolkata');
+    // seedUser normalizes to lowercase at insert time (matching real signup),
+    // so login with a DIFFERENT casing here proves login's own lowercasing
+    // works, not just that the seed happened to already match.
+    const r = await call(authController.login, { body: { email: 'CASELOGIN@EXAMPLE.COM', password: 'password123' } });
+    check(r.status === 200, 'login: different casing email → 200 (case-insensitive)', `got ${r.status}`);
   }
 
   // 10. Login with exact casing succeeds
@@ -120,7 +126,7 @@ async function seedUser(email, username, password, timezone) {
     const rawRefresh = generateRefreshToken();
     const tokenHash = hashRefreshToken(rawRefresh);
     const expiresAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // expired yesterday
-    await authService.storeRefreshToken({ user_id: user.id, profile_id: profile.id, token_hash: tokenHash, expires_at: expiresAt });
+    await authService.storeRefreshToken({ userId: user.id, profileId: profile.id, tokenHash, expiresAt });
 
     const r = await call(authController.refresh, { body: { refreshToken: rawRefresh } });
     check(r.status === 401, 'refresh: expired token → 401', `got ${r.status}`);
@@ -134,7 +140,7 @@ async function seedUser(email, username, password, timezone) {
     const { user, profile } = await seedUser('refresh2@example.com', 'refreshtwo', 'password123', 'Asia/Kolkata');
     const rawRefresh = generateRefreshToken();
     const tokenHash = hashRefreshToken(rawRefresh);
-    await authService.storeRefreshToken({ user_id: user.id, profile_id: profile.id, token_hash: tokenHash, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
+    await authService.storeRefreshToken({ userId: user.id, profileId: profile.id, tokenHash, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
 
     // First use - should succeed and revoke
     const r1 = await call(authController.refresh, { body: { refreshToken: rawRefresh } });
@@ -162,7 +168,7 @@ async function seedUser(email, username, password, timezone) {
 
     const rawRefresh = generateRefreshToken();
     const tokenHash = hashRefreshToken(rawRefresh);
-    await authService.storeRefreshToken({ user_id: user2.id, profile_id: profile2.id, token_hash: tokenHash, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
+    await authService.storeRefreshToken({ userId: user2.id, profileId: profile2.id, tokenHash, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
 
     // Try to logout as user1 with user2's token
     const r = await call(authController.logout, { body: { refreshToken: rawRefresh }, userId: user1.id, profileId: profile1.id });
@@ -174,18 +180,26 @@ async function seedUser(email, username, password, timezone) {
     check(stored && stored.revoked_at === null, 'other user token still valid (not revoked due to ownership check)');
   }
 
-  // 15. Logging out twice with same token is safe (no crash) - second returns 401
+  // 15. Logging out twice with same token is safe (no crash). logout() always
+  // returns 204 regardless of token validity - a deliberate anti-enumeration
+  // design so this endpoint never reveals whether a given token exists,
+  // belongs to someone else, or was already used. See authController.js.
   {
     const { user, profile } = await seedUser('logout3@example.com', 'logoutthree', 'password123', 'Asia/Kolkata');
     const rawRefresh = generateRefreshToken();
     const tokenHash = hashRefreshToken(rawRefresh);
-    await authService.storeRefreshToken({ user_id: user.id, profile_id: profile.id, token_hash: tokenHash, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
+    await authService.storeRefreshToken({ userId: user.id, profileId: profile.id, tokenHash, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
 
-    const r1 = await call(authController.logout, { body: { refreshToken: rawRefresh } });
+    const r1 = await call(authController.logout, { body: { refreshToken: rawRefresh }, userId: user.id });
     check(r1.status === 204, 'logout: first logout → 204', `got ${r1.status}`);
 
     const r2 = await call(authController.logout, { body: { refreshToken: rawRefresh } });
-    check(r2.status === 401, 'logout: second logout with same token → 401 (token already revoked)', `got ${r2.status}`);
+    check(r2.status === 204, 'logout: second logout with same (now-revoked) token → 204 (no enumeration)', `got ${r2.status}`);
+
+    // The real security property: the token is actually revoked after the
+    // first logout, even though the response doesn't reveal that.
+    const stored = mock._db.refresh_tokens.find(t => t.token_hash === tokenHash);
+    check(stored && stored.revoked_at !== null, 'token is actually revoked after first logout', `revoked_at: ${stored ? stored.revoked_at : 'not found'}`);
   }
 
   // 16. Missing token in body returns 400, not crash

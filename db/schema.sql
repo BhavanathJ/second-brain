@@ -12,7 +12,7 @@
 
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL,
+  email TEXT NOT NULL,
   username TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -20,6 +20,7 @@ CREATE TABLE users (
 
 -- Case-insensitive uniqueness — 'John' and 'john' are the same username,
 -- same reasoning as the profile-name duplicate check.
+CREATE UNIQUE INDEX users_email_unique_idx ON users (LOWER(email));
 CREATE UNIQUE INDEX users_username_unique_idx ON users (LOWER(username));
 
 -- Netflix-style profiles. This is the hard isolation boundary —

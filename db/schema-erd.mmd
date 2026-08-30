@@ -1,5 +1,7 @@
 erDiagram
   USERS ||--o{ PROFILES : owns
+  USERS }|--|| USERS_EMAIL_UNIQUE_IDX : enforces
+  USERS }|--|| USERS_USERNAME_UNIQUE_IDX : enforces
   USERS ||--o{ REFRESH_TOKENS : "has sessions"
   PROFILES ||--o{ REFRESH_TOKENS : "active in"
 
@@ -32,6 +34,16 @@ erDiagram
     text username
     text password_hash
     timestamptz created_at
+  }
+
+  USERS_EMAIL_UNIQUE_IDX {
+    unique_idx users_email_unique_idx
+    text LOWER(email)
+  }
+
+  USERS_USERNAME_UNIQUE_IDX {
+    unique_idx users_username_unique_idx
+    text LOWER(username)
   }
   PROFILES {
     uuid id PK

@@ -4,7 +4,7 @@ async function findUserByEmail(email) {
     const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('email', email)
+        .eq('email', email.toLowerCase())
         .maybeSingle();
 
     if (error) throw error;
@@ -36,7 +36,7 @@ async function findUserById(userId) {
 async function createUser({ email, username, passwordHash }) {
     const { data, error } = await supabase
         .from('users')
-        .insert({ email, username, password_hash: passwordHash })
+        .insert({ email: email.toLowerCase(), username, password_hash: passwordHash })
         .select()
         .single();
 

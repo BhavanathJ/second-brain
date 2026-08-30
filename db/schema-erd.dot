@@ -14,6 +14,18 @@ digraph SecondBrainSchema {
       <tr><td align="left">created_at</td></tr>
     </table>>];
 
+  users_email_unique_idx [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#FFEBEB">
+      <tr><td bgcolor="#CC0000"><font color="white"><b>users_email_unique_idx</b></font></td></tr>
+      <tr><td align="left">UNIQUE INDEX ON users (LOWER(email))</td></tr>
+    </table>>];
+
+  users_username_unique_idx [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#FFEBEB">
+      <tr><td bgcolor="#CC0000"><font color="white"><b>users_username_unique_idx</b></font></td></tr>
+      <tr><td align="left">UNIQUE INDEX ON users (LOWER(username))</td></tr>
+    </table>>];
+
   profiles [label=<
     <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#E1F5EE">
       <tr><td bgcolor="#0F6E56"><font color="white"><b>profiles</b></font></td></tr>
@@ -128,6 +140,8 @@ digraph SecondBrainSchema {
     </table>>];
 
   users -> profiles [label="1:N"];
+  users -> users_email_unique_idx [style=dotted color="#CC0000" label="enforces"];
+  users -> users_username_unique_idx [style=dotted color="#CC0000" label="enforces"];
   users -> refresh_tokens [label="1:N"];
   profiles -> refresh_tokens [label="1:N"];
   profiles -> settings [label="1:1"];

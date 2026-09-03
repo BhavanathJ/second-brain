@@ -1,15 +1,23 @@
 const reminderService = require('../services/reminderService');
 const binService = require('../services/binService');
+const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
 
 const VALID_ENTITY_TYPES = ['task', 'note', 'habit', 'calendar_event'];
 
 async function listReminders(req, res) {
+    let profileIds;
+    try {
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+
     try {
         const isDone = req.query.is_done === undefined
             ? undefined
             : req.query.is_done === 'true';
 
-        const reminders = await reminderService.listReminders(req.profileId, { isDone });
+        const reminders = await reminderService.listRemindersForProfiles(profileIds, { isDone });
         return res.status(200).json({ reminders });
     } catch (err) {
         console.error('List reminders error:', err);
@@ -19,8 +27,12 @@ async function listReminders(req, res) {
 
 async function getReminder(req, res) {
     try {
-        const reminder = await reminderService.getReminderById(req.profileId, req.params.id);
+        const reminder = await reminderService.getReminderByIdOnly(req.params.id);
         if (!reminder) {
+            return res.status(404).json({ error: 'Reminder not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, reminder.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Reminder not found.' });
         }
         return res.status(200).json({ reminder });
@@ -54,6 +66,15 @@ async function createReminder(req, res) {
         return res.status(400).json({
             error: `Invalid entity_type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}.`,
         });
+    }
+
+    // Optional: if profile_id is explicitly provided in body, verify ownership
+    const targetProfileId = req.body.profile_id ?? req.profileId;
+    if (req.body.profile_id !== undefined) {
+        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
+        if (!owns) {
+            return res.status(404).json({ error: 'Cannot create reminder: profile not owned by user.' });
+        }
     }
 
     try {
@@ -110,15 +131,20 @@ async function updateReminder(req, res) {
     }
 
     try {
-        const reminder = await reminderService.updateReminder(
-            req.profileId,
-            req.params.id,
-            fields
-        );
+        const reminder = await reminderService.getReminderByIdOnly(req.params.id);
         if (!reminder) {
             return res.status(404).json({ error: 'Reminder not found.' });
         }
-        return res.status(200).json({ reminder });
+        const owns = await verifyProfileOwnership(req.userId, reminder.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Reminder not found.' });
+        }
+        const updated = await reminderService.updateReminder(
+            reminder.profile_id,
+            req.params.id,
+            fields
+        );
+        return res.status(200).json({ reminder: updated });
     } catch (err) {
         console.error('Update reminder error:', err);
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -127,11 +153,20 @@ async function updateReminder(req, res) {
 
 async function deleteReminder(req, res) {
     try {
-        const reminder = await reminderService.softDeleteReminder(req.profileId, req.params.id);
+        const reminder = await reminderService.getReminderByIdOnly(req.params.id);
         if (!reminder) {
             return res.status(404).json({ error: 'Reminder not found.' });
         }
-        await binService.logDeletion(req.profileId, 'reminder', reminder.id);
+        const owns = await verifyProfileOwnership(req.userId, reminder.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Reminder not found.' });
+        }
+
+        const deleted = await reminderService.softDeleteReminder(reminder.profile_id, req.params.id);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Reminder not found.' });
+        }
+        await binService.logDeletion(reminder.profile_id, 'reminder', reminder.id);
         return res.status(204).send();
     } catch (err) {
         console.error('Delete reminder error:', err);

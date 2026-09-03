@@ -1,6 +1,7 @@
 const taskService = require('../services/taskService');
 const binService = require('../services/binService');
 const noteService = require('../services/noteService');
+const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
 
 function parseBoolParam(value) {
     if (value === undefined) return undefined;
@@ -8,9 +9,16 @@ function parseBoolParam(value) {
 }
 
 async function listTasks(req, res) {
+    let profileIds;
+    try {
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+
     try {
         const { urgent, important, status } = req.query;
-        const tasks = await taskService.listTasks(req.profileId, {
+        const tasks = await taskService.listTasksForProfiles(profileIds, {
             urgent: parseBoolParam(urgent),
             important: parseBoolParam(important),
             status,
@@ -24,8 +32,12 @@ async function listTasks(req, res) {
 
 async function getTask(req, res) {
     try {
-        const task = await taskService.getTaskById(req.profileId, req.params.id);
+        const task = await taskService.getTaskByIdOnly(req.params.id);
         if (!task) {
+            return res.status(404).json({ error: 'Task not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, task.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Task not found.' });
         }
         return res.status(200).json({ task });
@@ -51,6 +63,15 @@ async function createTask(req, res) {
         const validStatuses = ['pending', 'done'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` });
+        }
+    }
+
+    // Optional: if profile_id is explicitly provided in body, verify ownership
+    const targetProfileId = req.body.profile_id ?? req.profileId;
+    if (req.body.profile_id !== undefined) {
+        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
+        if (!owns) {
+            return res.status(404).json({ error: 'Cannot create task: profile not owned by user.' });
         }
     }
 
@@ -91,11 +112,16 @@ async function updateTask(req, res) {
     }
 
     try {
-        const task = await taskService.updateTask(req.profileId, req.params.id, fields);
+        const task = await taskService.getTaskByIdOnly(req.params.id);
         if (!task) {
             return res.status(404).json({ error: 'Task not found.' });
         }
-        return res.status(200).json({ task });
+        const owns = await verifyProfileOwnership(req.userId, task.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Task not found.' });
+        }
+        const updated = await taskService.updateTask(task.profile_id, req.params.id, fields);
+        return res.status(200).json({ task: updated });
     } catch (err) {
         console.error('Update task error:', err);
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -104,16 +130,25 @@ async function updateTask(req, res) {
 
 async function deleteTask(req, res) {
     try {
-        const task = await taskService.softDeleteTask(req.profileId, req.params.id);
+        const task = await taskService.getTaskByIdOnly(req.params.id);
         if (!task) {
             return res.status(404).json({ error: 'Task not found.' });
         }
+        const owns = await verifyProfileOwnership(req.userId, task.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Task not found.' });
+        }
 
-        await binService.logDeletion(req.profileId, 'task', task.id);
+        const deleted = await taskService.softDeleteTask(task.profile_id, req.params.id);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Task not found.' });
+        }
+
+        await binService.logDeletion(task.profile_id, 'task', task.id);
 
         // If this task was converted from a note, clear the converted_task_id on the note
         // so the note can be converted again
-        await noteService.clearConvertedTaskId(req.profileId, task.id);
+        await noteService.clearConvertedTaskId(task.profile_id, task.id);
 
         return res.status(204).send();
     } catch (err) {

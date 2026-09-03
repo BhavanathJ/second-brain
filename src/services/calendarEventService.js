@@ -112,6 +112,34 @@ async function getEventsForRange(profileId, startDate, endDate) {
     return data;
 }
 
+async function listCalendarEventsForProfiles(profileIds, { start, end } = {}) {
+    let query = supabase
+        .from('calendar_events')
+        .select('*')
+        .in('profile_id', profileIds)
+        .is('deleted_at', null)
+        .order('starts_at', { ascending: true });
+
+    if (start) query = query.gte('starts_at', start);
+    if (end) query = query.lte('starts_at', end);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+async function getCalendarEventByIdOnly(eventId) {
+    const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('id', eventId)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     listCalendarEvents,
     getCalendarEventById,
@@ -121,4 +149,6 @@ module.exports = {
     restoreCalendarEvent,
     hardDeleteCalendarEvent,
     getEventsForRange,
+    listCalendarEventsForProfiles,
+    getCalendarEventByIdOnly,
 };

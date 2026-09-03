@@ -24,7 +24,8 @@ async function call(fn, overrides) {
 
 async function seedUserWithProfile(email, username, password, profileName) {
   const passwordHash = await hashPassword(password);
-  const user = mock.seed('users', { email, username, password_hash: passwordHash });
+  // Use fixed userId 'u1' to match makeReqRes default
+  const user = mock.seed('users', { id: 'u1', email, username, password_hash: passwordHash });
   const profile = mock.seed('profiles', { user_id: user.id, name: profileName });
   await settingsService.createDefaultSettings(profile.id, TZ);
   return { user, profile, passwordHash };

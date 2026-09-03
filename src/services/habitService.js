@@ -195,6 +195,30 @@ function computeStreakForDates(dateSet, targetPerWeek, timeZone, weekStartsOn, n
     return streak;
 }
 
+async function listHabitsForProfiles(profileIds) {
+    const { data, error } = await supabase
+        .from('habits')
+        .select('*')
+        .in('profile_id', profileIds)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data;
+}
+
+async function getHabitByIdOnly(habitId) {
+    const { data, error } = await supabase
+        .from('habits')
+        .select('*')
+        .eq('id', habitId)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     listHabits,
     getHabitById,
@@ -207,4 +231,6 @@ module.exports = {
     buildHabitLogIndex,
     weeklyCountForDates,
     computeStreakForDates,
+    listHabitsForProfiles,
+    getHabitByIdOnly,
 };

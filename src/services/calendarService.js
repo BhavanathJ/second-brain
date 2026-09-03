@@ -60,4 +60,49 @@ async function getCalendarData(profileId, startDate, endDate) {
     return { tasks, habitLogs, calendarEvents, reminders };
 }
 
-module.exports = { getCalendarData };
+// Multi-profile version: fetches calendar data across multiple profiles.
+// Returns concatenated arrays, each item retains its profile_id column.
+async function getCalendarDataForProfiles(profileIds, startDate, endDate) {
+    const [tasks, habitLogs, calendarEvents, reminders] = await Promise.all([
+        supabase
+            .from('tasks')
+            .select('*')
+            .in('profile_id', profileIds)
+            .is('deleted_at', null)
+            .gte('due_at', startDate)
+            .lte('due_at', endDate)
+            .order('due_at', { ascending: true }),
+        supabase
+            .from('habit_logs')
+            .select('*, habits(id, title, target_per_week)')
+            .in('profile_id', profileIds)
+            .eq('completed', true)
+            .gte('log_date', startDate)
+            .lte('log_date', endDate)
+            .order('log_date', { ascending: true }),
+        calendarEventService.listCalendarEventsForProfiles(profileIds, { start: startDate, end: endDate }),
+        supabase
+            .from('reminders')
+            .select('*')
+            .in('profile_id', profileIds)
+            .is('deleted_at', null)
+            .gte('remind_at', startDate)
+            .lte('remind_at', endDate)
+            .order('remind_at', { ascending: true }),
+    ]);
+
+    // Check for errors
+    if (tasks.error) throw tasks.error;
+    if (habitLogs.error) throw habitLogs.error;
+    if (calendarEvents.error) throw calendarEvents.error;
+    if (reminders.error) throw reminders.error;
+
+    return {
+        tasks: tasks.data,
+        habitLogs: habitLogs.data,
+        calendarEvents: calendarEvents.data,
+        reminders: reminders.data,
+    };
+}
+
+module.exports = { getCalendarData, getCalendarDataForProfiles };

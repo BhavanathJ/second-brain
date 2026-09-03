@@ -1,6 +1,14 @@
 const calendarService = require('../services/calendarService');
+const { resolveProfileIds } = require('../utils/profileAccess');
 
 async function getCalendarData(req, res) {
+    let profileIds;
+    try {
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+
     const { start, end } = req.query;
 
     if (!start || !end) {
@@ -27,7 +35,14 @@ async function getCalendarData(req, res) {
     }
 
     try {
-        const data = await calendarService.getCalendarData(req.profileId, start, end);
+        // Single-profile case (backward compatible): use existing function
+        if (profileIds.length === 1 && profileIds[0] === req.profileId) {
+            const data = await calendarService.getCalendarData(req.profileId, start, end);
+            return res.status(200).json(data);
+        }
+
+        // Multi-profile case: use new function
+        const data = await calendarService.getCalendarDataForProfiles(profileIds, start, end);
         return res.status(200).json(data);
     } catch (err) {
         console.error('Get calendar data error:', err);

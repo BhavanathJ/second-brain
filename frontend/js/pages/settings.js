@@ -141,12 +141,15 @@ async function loadProfiles(currentProfileId) {
     mount.innerHTML = profiles.map(p => `
     <div class="profile-list-item d-flex align-items-center justify-content-between">
       <div>
-        <span>${escapeHtml(p.name)}</span>
+        <span style="display:inline-flex;align-items:center;gap:0.4rem;">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};border:1px solid var(--sb-border);"></span>
+          ${escapeHtml(p.name)}
+        </span>
         ${p.id === currentProfileId ? '<span class="text-muted ms-2">Active</span>' : ''}
       </div>
       <div class="btn-group btn-group-sm">
         ${p.id !== currentProfileId ? `
-          <button type="button" class="btn btn-outline-secondary rename-profile-btn" data-profile-id="${p.id}" data-profile-name="${escapeHtml(p.name)}" title="Rename">
+          <button type="button" class="btn btn-outline-secondary rename-profile-btn" data-profile-id="${p.id}" data-profile-name="${escapeHtml(p.name)}" data-profile-color="${p.color}" title="Rename">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708z"/></svg>
           </button>
           <button type="button" class="btn btn-outline-danger delete-profile-btn" data-profile-id="${p.id}" data-profile-name="${escapeHtml(p.name)}" title="Delete">
@@ -223,6 +226,7 @@ function handleRenameClick(e) {
     const btn = e.currentTarget;
     profileToRenameId = btn.dataset.profileId;
     const currentName = btn.dataset.profileName;
+    const currentColor = btn.dataset.profileColor;
 
     if (!renameProfileModal) {
         renameProfileModal = new bootstrap.Modal(document.getElementById('renameProfileModal'));
@@ -230,6 +234,15 @@ function handleRenameClick(e) {
 
     document.getElementById('renameProfileId').value = profileToRenameId;
     document.getElementById('renameProfileName').value = currentName;
+    document.getElementById('renameProfileColor').value = currentColor;
+    document.getElementById('renameProfileColorHex').textContent = currentColor.toUpperCase();
+
+    // Update hex display when color picker changes
+    const colorInput = document.getElementById('renameProfileColor');
+    colorInput.onchange = () => {
+        document.getElementById('renameProfileColorHex').textContent = colorInput.value.toUpperCase();
+    };
+
     renameProfileModal.show();
 }
 
@@ -258,10 +271,12 @@ async function handleRenameConfirm() {
         return;
     }
 
+    const newColor = document.getElementById('renameProfileColor').value;
+
     try {
         await apiFetch(`/profiles/${profileToRenameId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ name: newName })
+            body: JSON.stringify({ name: newName, color: newColor })
         });
         renameProfileModal.hide();
         window.location.reload();

@@ -32,6 +32,7 @@ digraph SecondBrainSchema {
       <tr><td align="left">id (PK)</td></tr>
       <tr><td align="left">user_id (FK)</td></tr>
       <tr><td align="left">name</td></tr>
+      <tr><td align="left">color</td></tr>
       <tr><td align="left">created_at</td></tr>
     </table>>];
 

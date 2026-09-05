@@ -2,6 +2,7 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
+import { initProfileFilter } from '../profileFilter.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -24,14 +25,51 @@ function dayLabel(dateStr) {
     return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })[0];
 }
 
+function formatDateWithTZ(isoString, timeZone, itemTimeZone) {
+    const base = formatDate(isoString, timeZone);
+    if (!itemTimeZone || itemTimeZone === timeZone) return base;
+    return `${base} (${itemTimeZone})`;
+}
+
+function formatDate(isoString, timeZone) {
+    if (!isoString) return '';
+    return new Date(isoString).toLocaleDateString('en-US', {
+        timeZone,
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
 let timeZone = 'UTC';
 let habits = [];
 let last7Days = [];
 const modalEl = document.getElementById('habitModal');
 const modal = new bootstrap.Modal(modalEl);
+let currentProfileFilter = null;
+let profilesCache = [];
+
+function renderProfileBadge(item) {
+    const profileIds = [...new Set(habits.map(h => h.profile_id).filter(Boolean))];
+    const showBadge = profileIds.length > 1 && item.profile_id;
+    const profile = profilesCache.find(p => p.id === item.profile_id);
+    if (!showBadge || !profile) return '';
+    return `
+        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
+            ${escapeHtml(profile.name)}
+        </span>
+    `;
+}
 
 async function loadHabits() {
-    const { habits: fetchedHabits } = await apiFetch('/habits');
+    let url = '/habits';
+    if (currentProfileFilter === 'all') {
+        url += '?profile_ids=all';
+    } else if (Array.isArray(currentProfileFilter) && currentProfileFilter.length > 0) {
+        url += `?profile_ids=${currentProfileFilter.join(',')}`;
+    }
+
+    const { habits: fetchedHabits } = await apiFetch(url);
     habits = fetchedHabits;
 
     const todayStr = getLocalDateString(timeZone);
@@ -45,6 +83,18 @@ async function loadHabits() {
         ...h,
         loggedDates: new Set(logsPerHabit[i].logs.filter(l => l.completed).map(l => l.log_date)),
     }));
+
+    // Cache profiles for badge rendering
+    const profileIds = [...new Set(habits.map(h => h.profile_id).filter(Boolean))];
+    if (profileIds.length > 0) {
+        try {
+            const { profiles } = await apiFetch('/profiles');
+            profilesCache = profiles;
+        } catch (err) {
+            console.error('Failed to load profiles for badges:', err);
+            profilesCache = [];
+        }
+    }
 
     render();
 }
@@ -69,7 +119,7 @@ function renderHabitCard(habit) {
     <div class="habit-card">
       <div class="habit-card-header">
         <div>
-          <div class="habit-title">${escapeHtml(habit.title)}</div>
+          <div class="habit-title">${escapeHtml(habit.title)}${renderProfileBadge(habit)}</div>
           <div class="habit-progress-label">${habit.this_week_count} / ${habit.target_per_week} this week</div>
         </div>
         <div class="habit-streak">🔥 ${habit.streak} wk streak</div>
@@ -184,6 +234,12 @@ async function main() {
     } catch (err) {
         console.error('Failed to load settings, defaulting habit dates to UTC:', err);
     }
+
+    // Initialize profile filter
+    await initProfileFilter((profileIds) => {
+        currentProfileFilter = profileIds;
+        loadHabits();
+    });
 
     document.getElementById('addHabitBtn').addEventListener('click', () => openModal(null));
     document.getElementById('habitForm').addEventListener('submit', handleSubmit);

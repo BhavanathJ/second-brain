@@ -29,6 +29,7 @@ CREATE TABLE profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#6B7280',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

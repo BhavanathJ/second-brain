@@ -74,8 +74,14 @@ async function populateProfileSwitcher(currentProfileId) {
     try {
         const { profiles } = await apiFetch('/profiles');
         select.innerHTML = profiles
-            .map(p => `<option value="${p.id}"${p.id === currentProfileId ? ' selected' : ''}>${p.name}</option>`)
+            .map(p => `<option value="${p.id}"${p.id === currentProfileId ? ' selected' : ''} data-color="${p.color}">${p.name}</option>`)
             .join('');
+
+        // Apply color accent to the active profile via CSS variable
+        const activeOption = select.options[select.selectedIndex];
+        if (activeOption && activeOption.dataset.color) {
+            select.style.setProperty('--profile-color', activeOption.dataset.color);
+        }
     } catch (err) {
         console.error('Failed to load profiles:', err);
     }
@@ -95,6 +101,14 @@ async function populateProfileSwitcher(currentProfileId) {
             window.location.reload();
         } catch (err) {
             showToast('Failed to switch profile: ' + err.message);
+        }
+    });
+
+    // Update border color when selection changes (before reload)
+    select.addEventListener('change', () => {
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption && selectedOption.dataset.color) {
+            select.style.setProperty('--profile-color', selectedOption.dataset.color);
         }
     });
 }

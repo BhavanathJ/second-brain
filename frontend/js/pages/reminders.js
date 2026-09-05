@@ -2,6 +2,7 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
+import { initProfileFilter } from '../profileFilter.js';
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -15,6 +16,12 @@ function formatDateTime(isoString, timeZone) {
     });
 }
 
+function formatDateTimeWithTZ(isoString, timeZone, itemTimeZone) {
+    const base = formatDateTime(isoString, timeZone);
+    if (!itemTimeZone || itemTimeZone === timeZone) return base;
+    return `${base} (${itemTimeZone})`;
+}
+
 function isoToLocalInput(isoString) {
     if (!isoString) return '';
     const d = new Date(isoString);
@@ -26,13 +33,28 @@ let timeZone = 'UTC';
 let allReminders = [];
 const modalEl = document.getElementById('reminderModal');
 const modal = new bootstrap.Modal(modalEl);
+let currentProfileFilter = null;
+let profilesCache = [];
+
+function renderProfileBadge(item) {
+    const profileIds = [...new Set(allReminders.map(r => r.profile_id).filter(Boolean))];
+    const showBadge = profileIds.length > 1 && item.profile_id;
+    const profile = profilesCache.find(p => p.id === item.profile_id);
+    if (!showBadge || !profile) return '';
+    return `
+        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
+            ${escapeHtml(profile.name)}
+        </span>
+    `;
+}
 
 function renderReminderItem(r) {
     return `
     <div class="reminder-item${r.is_done ? ' done' : ''}">
       <div class="reminder-body">
-        <div class="reminder-title">${escapeHtml(r.title)}</div>
-        <div class="reminder-time">${formatDateTime(r.remind_at, timeZone)}</div>
+        <div class="reminder-title">${escapeHtml(r.title)}${renderProfileBadge(r)}</div>
+        <div class="reminder-time">${formatDateTimeWithTZ(r.remind_at, timeZone, r.profile_timezone)}</div>
       </div>
       <div class="reminder-actions">
         <button class="btn ${r.is_done ? 'btn-outline-secondary' : 'btn-outline-primary'} reminder-toggle-btn" data-id="${r.id}" data-done="${r.is_done}">
@@ -61,8 +83,28 @@ function render() {
 }
 
 async function loadReminders() {
-    const { reminders } = await apiFetch('/reminders');
+    let url = '/reminders';
+    if (currentProfileFilter === 'all') {
+        url += '?profile_ids=all';
+    } else if (Array.isArray(currentProfileFilter) && currentProfileFilter.length > 0) {
+        url += `?profile_ids=${currentProfileFilter.join(',')}`;
+    }
+
+    const { reminders } = await apiFetch(url);
     allReminders = reminders;
+
+    // Cache profiles for badge rendering
+    const profileIds = [...new Set(reminders.map(r => r.profile_id).filter(Boolean))];
+    if (profileIds.length > 0) {
+        try {
+            const { profiles } = await apiFetch('/profiles');
+            profilesCache = profiles;
+        } catch (err) {
+            console.error('Failed to load profiles for badges:', err);
+            profilesCache = [];
+        }
+    }
+
     render();
 }
 
@@ -154,6 +196,12 @@ async function main() {
     } catch (err) {
         console.error('Failed to load settings, defaulting reminder times to UTC:', err);
     }
+
+    // Initialize profile filter
+    await initProfileFilter((profileIds) => {
+        currentProfileFilter = profileIds;
+        loadReminders();
+    });
 
     document.getElementById('addReminderBtn').addEventListener('click', () => openModal(null));
     document.getElementById('reminderForm').addEventListener('submit', handleSubmit);

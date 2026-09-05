@@ -2,6 +2,7 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
+import { initProfileFilter } from '../profileFilter.js';
 import {
     getLocalDateString, addDays, addMonths,
     getLocalMonthBounds, getLocalWeekBounds, getLocalDayBounds,
@@ -17,6 +18,12 @@ function formatTime(isoString, timeZone) {
     return new Date(isoString).toLocaleTimeString('en-US', { timeZone, hour: 'numeric', minute: '2-digit' });
 }
 
+function formatTimeWithTZ(isoString, timeZone, itemTimeZone) {
+    const base = formatTime(isoString, timeZone);
+    if (!itemTimeZone || itemTimeZone === timeZone) return base;
+    return `${base} (${itemTimeZone})`;
+}
+
 function labelForDate(dateStr, opts) {
     return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
 }
@@ -29,6 +36,8 @@ let itemsByDate = new Map();
 let selectedDateStr = null;
 const modalEl = document.getElementById('eventModal');
 const modal = new bootstrap.Modal(modalEl);
+let currentProfileFilter = null;
+let profilesCache = [];
 
 function bucketData(data) {
     const map = new Map();
@@ -59,6 +68,22 @@ function dotsHTML(items) {
     return ['tasks', 'events', 'reminders', 'habits']
         .filter(type => items[type].length > 0)
         .map(type => `<span class="cal-dot ${type.slice(0, -1)}"></span>`).join('');
+}
+
+function renderProfileBadge(item) {
+    const allItems = Array.from(itemsByDate.values()).flatMap(d =>
+        [...d.tasks, ...d.events, ...d.reminders, ...d.habits]
+    );
+    const profileIds = [...new Set(allItems.map(i => i.profile_id).filter(Boolean))];
+    const showBadge = profileIds.length > 1 && item.profile_id;
+    const profile = profilesCache.find(p => p.id === item.profile_id);
+    if (!showBadge || !profile) return '';
+    return `
+        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
+            ${escapeHtml(profile.name)}
+        </span>
+    `;
 }
 
 function renderMonthGrid() {
@@ -139,9 +164,9 @@ function renderDayPanel() {
     const label = labelForDate(selectedDateStr, { weekday: 'long', month: 'long', day: 'numeric' });
 
     const rows = items ? [
-        ...items.tasks.map(t => ({ badge: 'task', title: t.title, time: t.due_at ? formatTime(t.due_at, timeZone) : '', deletable: false })),
-        ...items.events.map(e => ({ badge: 'event', title: e.title, time: formatTime(e.starts_at, timeZone), deletable: true, id: e.id })),
-        ...items.reminders.map(r => ({ badge: 'reminder', title: r.title, time: formatTime(r.remind_at, timeZone), deletable: false })),
+        ...items.tasks.map(t => ({ badge: 'task', title: t.title, time: t.due_at ? formatTimeWithTZ(t.due_at, timeZone, t.profile_timezone) : '', deletable: false })),
+        ...items.events.map(e => ({ badge: 'event', title: e.title, time: formatTimeWithTZ(e.starts_at, timeZone, e.profile_timezone), deletable: true, id: e.id })),
+        ...items.reminders.map(r => ({ badge: 'reminder', title: r.title, time: formatTimeWithTZ(r.remind_at, timeZone, r.profile_timezone), deletable: false })),
         ...items.habits.map(h => ({ badge: 'habit', title: h.habits?.title ?? 'Habit', time: '✓ done', deletable: false })),
     ] : [];
 
@@ -150,7 +175,7 @@ function renderDayPanel() {
     ${rows.length === 0 ? '<div class="dash-empty">Nothing on this day.</div>' : rows.map(r => `
       <div class="cal-panel-item">
         <span class="cal-panel-badge ${r.badge}">${r.badge}</span>
-        <span class="flex-grow-1">${escapeHtml(r.title)}</span>
+        <span class="flex-grow-1">${escapeHtml(r.title)}${renderProfileBadge(r)}</span>
         <span class="dash-item-time">${r.time}</span>
         ${r.deletable ? `<button class="btn btn-outline-danger btn-sm cal-event-delete-btn" data-id="${r.id}">Delete</button>` : ''}
       </div>
@@ -201,9 +226,31 @@ function boundsForCurrentView() {
 }
 
 async function loadView() {
-    const { startISO, endISO } = boundsForCurrentView();
-    const data = await apiFetch(`/calendar?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`);
+    let url = `/calendar?start=${encodeURIComponent(boundsForCurrentView().startISO)}&end=${encodeURIComponent(boundsForCurrentView().endISO)}`;
+    if (currentProfileFilter === 'all') {
+        url += '&profile_ids=all';
+    } else if (Array.isArray(currentProfileFilter) && currentProfileFilter.length > 0) {
+        url += `&profile_ids=${currentProfileFilter.join(',')}`;
+    }
+
+    const data = await apiFetch(url);
     itemsByDate = bucketData(data);
+
+    // Cache profiles for badge rendering
+    const allItems = Array.from(itemsByDate.values()).flatMap(d =>
+        [...d.tasks, ...d.events, ...d.reminders, ...d.habits]
+    );
+    const profileIds = [...new Set(allItems.map(i => i.profile_id).filter(Boolean))];
+    if (profileIds.length > 0) {
+        try {
+            const { profiles } = await apiFetch('/profiles');
+            profilesCache = profiles;
+        } catch (err) {
+            console.error('Failed to load profiles for badges:', err);
+            profilesCache = [];
+        }
+    }
+
     renderCurrentView();
 }
 
@@ -259,6 +306,12 @@ async function main() {
 
     anchorDateStr = getLocalDateString(timeZone);
     selectedDateStr = anchorDateStr; // auto-select today on initial load, in every view mode
+
+    // Initialize profile filter
+    await initProfileFilter((profileIds) => {
+        currentProfileFilter = profileIds;
+        loadView();
+    });
 
     document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
     document.getElementById('nextBtn').addEventListener('click', () => navigate(1));

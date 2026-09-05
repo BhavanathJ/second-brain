@@ -21,10 +21,10 @@ async function countProfilesForUser(userId) {
     return count;
 }
 
-async function createProfile(userId, name) {
+async function createProfile(userId, name, color) {
     const { data, error } = await supabase
         .from('profiles')
-        .insert({ user_id: userId, name })
+        .insert({ user_id: userId, name, color })
         .select()
         .single();
 
@@ -57,6 +57,27 @@ async function renameProfile(userId, profileId, name) {
     return data;
 }
 
+async function updateProfile(userId, profileId, { name, color }) {
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (color !== undefined) updates.color = color;
+
+    if (Object.keys(updates).length === 0) {
+        return null;
+    }
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('user_id', userId)
+        .eq('id', profileId)
+        .select()
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 // Cascade-deletes every task/note/habit/reminder/event/bin-entry/
 // settings row tied to this profile, via the DB's ON DELETE CASCADE —
 // irreversible, no soft-delete, no Bin recovery. Callers must have
@@ -77,5 +98,6 @@ module.exports = {
     createProfile,
     findProfileForUser,
     renameProfile,
+    updateProfile,
     deleteProfile,
 };

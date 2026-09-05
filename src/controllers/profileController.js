@@ -4,6 +4,61 @@ const { issueTokenPair, revokeRefreshTokenByRaw } = require('./authController');
 const authService = require('../services/authService');
 const { normalizeTimezone, isValidTimezone } = require('../utils/timezone');
 
+// Reserved colors that must not be used for profile badges (Signal's semantic alert/success colors)
+const RESERVED_COLORS = new Set([
+    '#C74530', // danger red
+    '#4A7C59', // success green
+    '#D97157', // warning orange
+    '#6FA57E', // success green variant
+]);
+
+// Pre-vetted safe rotation for auto-assignment (none are in RESERVED_COLORS)
+const AUTO_COLOR_ROTATION = [
+    '#2563EB', // blue
+    '#7C3AED', // violet
+    '#DB2777', // pink
+    '#EA580C', // orange
+    '#0D9488', // teal
+    '#4F46E5', // indigo
+    '#65A30D', // lime
+    '#0891B2', // cyan
+];
+
+// Validate a manually-provided color string
+function validateColor(color, userId, excludeProfileId = null) {
+    // a. Must match hex format
+    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        return { valid: false, error: 'Color must be a valid hex color (e.g., #2563EB).' };
+    }
+
+    const upperColor = color.toUpperCase();
+
+    // b. Must not be a reserved value (case-insensitive)
+    if (RESERVED_COLORS.has(upperColor)) {
+        return { valid: false, error: 'This color is reserved for system indicators and cannot be used.' };
+    }
+
+    // c. Must not match another profile's color for the same user (case-insensitive)
+    // Note: this is checked in the controller where we have access to the profile list
+
+    return { valid: true };
+}
+
+// Auto-assign a color not already used by the user's other profiles
+async function autoAssignColor(userId) {
+    const profiles = await profileService.listProfilesForUser(userId);
+    const usedColors = new Set(profiles.map(p => (p.color || '#6B7280').toUpperCase()));
+
+    for (const color of AUTO_COLOR_ROTATION) {
+        if (!usedColors.has(color.toUpperCase())) {
+            return color;
+        }
+    }
+
+    // All colors taken - wrap around to first available (should be very rare)
+    return AUTO_COLOR_ROTATION[0];
+}
+
 async function listProfiles(req, res) {
     try {
         const profiles = await profileService.listProfilesForUser(req.userId);
@@ -38,7 +93,10 @@ async function createProfile(req, res) {
             return res.status(400).json({ error: 'A profile with this name already exists.' });
         }
 
-        const profile = await profileService.createProfile(req.userId, trimmedName);
+        // Auto-assign a color not already used by this user's profiles
+        const assignedColor = await autoAssignColor(req.userId);
+
+        const profile = await profileService.createProfile(req.userId, trimmedName, assignedColor);
         await settingsService.createDefaultSettings(profile.id, validatedTimezone);
 
         return res.status(201).json({ profile });
@@ -74,31 +132,54 @@ async function selectProfile(req, res) {
 }
 
 async function renameProfile(req, res) {
-    const { name } = req.body;
+    const { name, color } = req.body;
 
-    if (!name || !name.trim()) {
-        return res.status(400).json({ error: 'Profile name is required.' });
+    // Validate that at least one field is provided
+    if ((!name || !name.trim()) && color === undefined) {
+        return res.status(400).json({ error: 'Profile name or color is required.' });
     }
 
-    const trimmedName = name.trim();
+    const trimmedName = name?.trim();
+
+    // Validate color if provided
+    if (color !== undefined) {
+        const validation = validateColor(color, req.userId, req.params.id);
+        if (!validation.valid) {
+            return res.status(400).json({ error: validation.error });
+        }
+
+        // Check for duplicate color among other profiles of this user
+        const profiles = await profileService.listProfilesForUser(req.userId);
+        const duplicateColor = profiles.find(p =>
+            p.id !== req.params.id && (p.color || '#6B7280').toUpperCase() === color.toUpperCase()
+        );
+        if (duplicateColor) {
+            return res.status(400).json({ error: 'Another profile already uses this color.' });
+        }
+    }
 
     try {
         // Check for duplicate profile name for this user (excluding the profile being renamed)
-        const profiles = await profileService.listProfilesForUser(req.userId);
-        const duplicate = profiles.find(p =>
-            p.id !== req.params.id && p.name.toLowerCase() === trimmedName.toLowerCase()
-        );
-        if (duplicate) {
-            return res.status(400).json({ error: 'A profile with this name already exists.' });
+        if (trimmedName) {
+            const profiles = await profileService.listProfilesForUser(req.userId);
+            const duplicate = profiles.find(p =>
+                p.id !== req.params.id && p.name.toLowerCase() === trimmedName.toLowerCase()
+            );
+            if (duplicate) {
+                return res.status(400).json({ error: 'A profile with this name already exists.' });
+            }
         }
 
-        const profile = await profileService.renameProfile(req.userId, req.params.id, trimmedName);
+        const profile = await profileService.updateProfile(req.userId, req.params.id, {
+            name: trimmedName,
+            color,
+        });
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found.' });
         }
         return res.status(200).json({ profile });
     } catch (err) {
-        console.error('Rename profile error:', err);
+        console.error('Update profile error:', err);
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 }

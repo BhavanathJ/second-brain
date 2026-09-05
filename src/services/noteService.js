@@ -132,6 +132,35 @@ async function clearConvertedTaskId(profileId, taskId) {
     return data;
 }
 
+async function listNotesForProfiles(profileIds, { tags } = {}) {
+    let query = supabase
+        .from('notes')
+        .select('*')
+        .in('profile_id', profileIds)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+    if (tags && tags.length > 0) {
+        query = query.contains('tags', tags);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+async function getNoteByIdOnly(noteId) {
+    const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('id', noteId)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     listNotes,
     getNoteById,
@@ -142,4 +171,6 @@ module.exports = {
     restoreNote,
     hardDeleteNote,
     clearConvertedTaskId,
+    listNotesForProfiles,
+    getNoteByIdOnly,
 };

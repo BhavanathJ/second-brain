@@ -1,8 +1,16 @@
 const noteService = require('../services/noteService');
 const taskService = require('../services/taskService');
 const binService = require('../services/binService');
+const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
 
 async function listNotes(req, res) {
+    let profileIds;
+    try {
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+
     try {
         // Tags arrive as a comma-separated query string: ?tags=work,ideas
         // Split into an array, filter out empty strings from trailing commas.
@@ -10,7 +18,7 @@ async function listNotes(req, res) {
             ? req.query.tags.split(',').map(t => t.trim()).filter(Boolean)
             : [];
 
-        const notes = await noteService.listNotes(req.profileId, { tags });
+        const notes = await noteService.listNotesForProfiles(profileIds, { tags });
         return res.status(200).json({ notes });
     } catch (err) {
         console.error('List notes error:', err);
@@ -20,8 +28,12 @@ async function listNotes(req, res) {
 
 async function getNote(req, res) {
     try {
-        const note = await noteService.getNoteById(req.profileId, req.params.id);
+        const note = await noteService.getNoteByIdOnly(req.params.id);
         if (!note) {
+            return res.status(404).json({ error: 'Note not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, note.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Note not found.' });
         }
         return res.status(200).json({ note });
@@ -36,6 +48,15 @@ async function createNote(req, res) {
 
     if (!content || !content.trim()) {
         return res.status(400).json({ error: 'Content is required.' });
+    }
+
+    // Optional: if profile_id is explicitly provided in body, verify ownership
+    const targetProfileId = req.body.profile_id ?? req.profileId;
+    if (req.body.profile_id !== undefined) {
+        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
+        if (!owns) {
+            return res.status(404).json({ error: 'Cannot create note: profile not owned by user.' });
+        }
     }
 
     try {
@@ -63,11 +84,16 @@ async function updateNote(req, res) {
     }
 
     try {
-        const note = await noteService.updateNote(req.profileId, req.params.id, fields);
+        const note = await noteService.getNoteByIdOnly(req.params.id);
         if (!note) {
             return res.status(404).json({ error: 'Note not found.' });
         }
-        return res.status(200).json({ note });
+        const owns = await verifyProfileOwnership(req.userId, note.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Note not found.' });
+        }
+        const updated = await noteService.updateNote(note.profile_id, req.params.id, fields);
+        return res.status(200).json({ note: updated });
     } catch (err) {
         console.error('Update note error:', err);
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -76,11 +102,20 @@ async function updateNote(req, res) {
 
 async function deleteNote(req, res) {
     try {
-        const note = await noteService.softDeleteNote(req.profileId, req.params.id);
+        const note = await noteService.getNoteByIdOnly(req.params.id);
         if (!note) {
             return res.status(404).json({ error: 'Note not found.' });
         }
-        await binService.logDeletion(req.profileId, 'note', note.id);
+        const owns = await verifyProfileOwnership(req.userId, note.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Note not found.' });
+        }
+
+        const deleted = await noteService.softDeleteNote(note.profile_id, req.params.id);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Note not found.' });
+        }
+        await binService.logDeletion(note.profile_id, 'note', note.id);
         return res.status(204).send();
     } catch (err) {
         console.error('Delete note error:', err);
@@ -96,8 +131,12 @@ async function deleteNote(req, res) {
 //    and now, this write fails cleanly instead of silently overwriting it.
 async function convertNoteToTask(req, res) {
     try {
-        const note = await noteService.getNoteById(req.profileId, req.params.id);
+        const note = await noteService.getNoteByIdOnly(req.params.id);
         if (!note) {
+            return res.status(404).json({ error: 'Note not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, note.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Note not found.' });
         }
 
@@ -116,7 +155,8 @@ async function convertNoteToTask(req, res) {
         const important = Boolean(req.body.important);
         const due_at = req.body.due_at ? new Date(req.body.due_at) : null;
 
-        const task = await taskService.createTask(req.profileId, {
+        // Create the task under the NOTE's own profile_id (not req.profileId)
+        const task = await taskService.createTask(note.profile_id, {
             title,
             description,
             urgent,
@@ -125,7 +165,7 @@ async function convertNoteToTask(req, res) {
         });
 
         const updatedNote = await noteService.markNoteConverted(
-            req.profileId,
+            note.profile_id,
             note.id,
             task.id
         );
@@ -134,9 +174,9 @@ async function convertNoteToTask(req, res) {
             // Lost the race — someone else converted this note between our
             // check above and this write. Clean up the orphan task we just
             // created rather than leaving a duplicate, untethered task behind.
-            await taskService.hardDeleteTask(req.profileId, task.id);
+            await taskService.hardDeleteTask(note.profile_id, task.id);
 
-            const currentNote = await noteService.getNoteById(req.profileId, note.id);
+            const currentNote = await noteService.getNoteById(note.profile_id, note.id);
             return res.status(409).json({
                 error: 'This note has already been converted to a task.',
                 taskId: currentNote?.converted_task_id ?? null,

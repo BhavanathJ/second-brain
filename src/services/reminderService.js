@@ -117,6 +117,33 @@ async function fireReminders() {
     return data;
 }
 
+async function listRemindersForProfiles(profileIds, { isDone } = {}) {
+    let query = supabase
+        .from('reminders')
+        .select('*')
+        .in('profile_id', profileIds)
+        .is('deleted_at', null)
+        .order('remind_at', { ascending: true });
+
+    if (isDone !== undefined) query = query.eq('is_done', isDone);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+async function getReminderByIdOnly(reminderId) {
+    const { data, error } = await supabase
+        .from('reminders')
+        .select('*')
+        .eq('id', reminderId)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     listReminders,
     getReminderById,
@@ -126,4 +153,6 @@ module.exports = {
     restoreReminder,
     hardDeleteReminder,
     fireReminders,
+    listRemindersForProfiles,
+    getReminderByIdOnly,
 };

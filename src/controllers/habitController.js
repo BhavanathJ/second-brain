@@ -3,19 +3,31 @@ const habitLogService = require('../services/habitLogService');
 const binService = require('../services/binService');
 const settingsService = require('../services/settingsService');
 const { getLocalDateString } = require('../utils/profileTime');
+const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
 
 async function listHabits(req, res) {
+    let profileIds;
     try {
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+
+    try {
+        // Use settings from the primary (active) profile for timezone/week_starts_on
         const settings = await settingsService.getSettings(req.profileId);
         const { timezone, week_starts_on } = settings;
 
-        const habits = await habitService.listHabits(req.profileId);
+        const habits = await habitService.listHabitsForProfiles(profileIds);
 
-        // ONE logs query for all habits, indexed by habit_id. The weekly
-        // counts and streaks are pure date-math on the fetched dates
-        // (previously this issued ~53 queries per habit, one per week).
-        const logs = await habitService.getCompletedLogs(req.profileId, timezone, week_starts_on);
-        const logIndex = habitService.buildHabitLogIndex(logs);
+        // ONE logs query for all habits across all requested profiles, indexed by habit_id.
+        // We fetch logs for each profile and merge them.
+        let allLogs = [];
+        for (const pid of profileIds) {
+            const logs = await habitService.getCompletedLogs(pid, timezone, week_starts_on);
+            allLogs = allLogs.concat(logs);
+        }
+        const logIndex = habitService.buildHabitLogIndex(allLogs);
 
         const habitsWithProgress = habits.map((habit) => {
             const dateSet = logIndex.get(habit.id) ?? new Set();
@@ -38,15 +50,19 @@ async function listHabits(req, res) {
 
 async function getHabit(req, res) {
     try {
-        const habit = await habitService.getHabitById(req.profileId, req.params.id);
+        const habit = await habitService.getHabitByIdOnly(req.params.id);
         if (!habit) {
+            return res.status(404).json({ error: 'Habit not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, habit.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
 
         const settings = await settingsService.getSettings(req.profileId);
         const { timezone, week_starts_on } = settings;
 
-        const logs = await habitService.getCompletedLogs(req.profileId, timezone, week_starts_on, habit.id);
+        const logs = await habitService.getCompletedLogs(habit.profile_id, timezone, week_starts_on, habit.id);
         const dateSet = habitService.buildHabitLogIndex(logs).get(habit.id) ?? new Set();
         const weeklyCount = habitService.weeklyCountForDates(dateSet, timezone, week_starts_on);
         const streak = habitService.computeStreakForDates(dateSet, habit.target_per_week, timezone, week_starts_on);
@@ -78,6 +94,15 @@ async function createHabit(req, res) {
         const n = Number(target_per_week);
         if (!Number.isInteger(n) || n < 1 || n > 7) {
             return res.status(400).json({ error: 'target_per_week must be an integer between 1 and 7.' });
+        }
+    }
+
+    // Optional: if profile_id is explicitly provided in body, verify ownership
+    const targetProfileId = req.body.profile_id ?? req.profileId;
+    if (req.body.profile_id !== undefined) {
+        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
+        if (!owns) {
+            return res.status(404).json({ error: 'Cannot create habit: profile not owned by user.' });
         }
     }
 
@@ -113,11 +138,16 @@ async function updateHabit(req, res) {
     }
 
     try {
-        const habit = await habitService.updateHabit(req.profileId, req.params.id, fields);
+        const habit = await habitService.getHabitByIdOnly(req.params.id);
         if (!habit) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
-        return res.status(200).json({ habit });
+        const owns = await verifyProfileOwnership(req.userId, habit.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Habit not found.' });
+        }
+        const updated = await habitService.updateHabit(habit.profile_id, req.params.id, fields);
+        return res.status(200).json({ habit: updated });
     } catch (err) {
         console.error('Update habit error:', err);
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -126,11 +156,20 @@ async function updateHabit(req, res) {
 
 async function deleteHabit(req, res) {
     try {
-        const habit = await habitService.softDeleteHabit(req.profileId, req.params.id);
+        const habit = await habitService.getHabitByIdOnly(req.params.id);
         if (!habit) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
-        await binService.logDeletion(req.profileId, 'habit', habit.id);
+        const owns = await verifyProfileOwnership(req.userId, habit.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Habit not found.' });
+        }
+
+        const deleted = await habitService.softDeleteHabit(habit.profile_id, req.params.id);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Habit not found.' });
+        }
+        await binService.logDeletion(habit.profile_id, 'habit', habit.id);
         return res.status(204).send();
     } catch (err) {
         console.error('Delete habit error:', err);
@@ -140,8 +179,12 @@ async function deleteHabit(req, res) {
 
 async function logCompletion(req, res) {
     try {
-        const habit = await habitService.getHabitById(req.profileId, req.params.id);
+        const habit = await habitService.getHabitByIdOnly(req.params.id);
         if (!habit) {
+            return res.status(404).json({ error: 'Habit not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, habit.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
 
@@ -182,7 +225,7 @@ async function logCompletion(req, res) {
             return res.status(400).json({ error: 'Date cannot be before habit creation date.' });
         }
 
-        const log = await habitLogService.createLog(habit.id, req.profileId, date);
+        const log = await habitLogService.createLog(habit.id, habit.profile_id, date);
         return res.status(201).json({ log });
     } catch (err) {
         if (err.code === '23505') {
@@ -213,12 +256,16 @@ async function deleteLog(req, res) {
     }
 
     try {
-        const habit = await habitService.getHabitById(req.profileId, req.params.id);
+        const habit = await habitService.getHabitByIdOnly(req.params.id);
         if (!habit) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
+        const owns = await verifyProfileOwnership(req.userId, habit.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Habit not found.' });
+        }
 
-        const deleted = await habitLogService.deleteLog(habit.id, req.profileId, date);
+        const deleted = await habitLogService.deleteLog(habit.id, habit.profile_id, date);
         if (!deleted) {
             return res.status(404).json({ error: 'No log found for this date.' });
         }
@@ -260,12 +307,16 @@ async function getLogs(req, res) {
     }
 
     try {
-        const habit = await habitService.getHabitById(req.profileId, req.params.id);
+        const habit = await habitService.getHabitByIdOnly(req.params.id);
         if (!habit) {
             return res.status(404).json({ error: 'Habit not found.' });
         }
+        const owns = await verifyProfileOwnership(req.userId, habit.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Habit not found.' });
+        }
 
-        const logs = await habitLogService.getLogsForRange(habit.id, req.profileId, start, end);
+        const logs = await habitLogService.getLogsForRange(habit.id, habit.profile_id, start, end);
         return res.status(200).json({ logs });
     } catch (err) {
         console.error('Get logs error:', err);

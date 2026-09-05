@@ -1,66 +1,44 @@
-const supabase = require('../config/supabase');
+const profileService = require('../services/profileService');
 
-/**
- * Resolves the list of profile IDs to query based on the profile_ids query param.
- * Supports three modes:
- * - null/undefined: single profile (active profile only) - uses req.profileId
- * - 'all': all profiles belonging to the user
- * - comma-separated list: specific profile IDs (validates ownership)
- *
- * @param {string} userId - The authenticated user's ID
- * @param {string} activeProfileId - The currently active profile ID (from JWT)
- * @param {string|null} profileIdsParam - The profile_ids query parameter
- * @returns {Promise<string[]>} Array of profile IDs to query
- * @throws {Error} With statusCode property for HTTP errors
- */
-async function resolveProfileIds(userId, activeProfileId, profileIdsParam) {
-    // No profile_ids param = single profile mode (backward compatible)
-    if (!profileIdsParam || profileIdsParam.trim() === '') {
-        return [activeProfileId];
+// Resolves a profile_ids request param into a validated array of profile
+// IDs the given user actually owns. NEVER trust a client-supplied profile
+// id without checking ownership first.
+//
+// - profileIdsParam is undefined/null/empty -> returns [defaultProfileId]
+//   (today's exact behavior, unchanged — this is what preserves backward
+//   compatibility with every existing test and every existing frontend call)
+// - profileIdsParam === 'all' -> returns every profile id owned by userId
+// - profileIdsParam is a comma-separated string of ids -> returns that
+//   exact list, after verifying every id in it belongs to userId
+async function resolveProfileIds(userId, defaultProfileId, profileIdsParam) {
+    if (!profileIdsParam) {
+        return [defaultProfileId];
     }
 
-    const param = profileIdsParam.trim().toLowerCase();
+    const owned = await profileService.listProfilesForUser(userId);
+    const ownedIds = new Set(owned.map(p => p.id));
 
-    // 'all' keyword = all user profiles
-    if (param === 'all') {
-        const { data: profiles, error } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', userId)
-            .is('deleted_at', null);
-
-        if (error) throw error;
-        return profiles.map(p => p.id);
+    if (profileIdsParam === 'all') {
+        return Array.from(ownedIds);
     }
 
-    // Comma-separated list of profile IDs
-    const requestedIds = param.split(',').map(id => id.trim()).filter(Boolean);
-
-    if (requestedIds.length === 0) {
-        return [activeProfileId];
-    }
-
-    // Validate all requested profiles belong to the user
-    const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', userId)
-        .in('id', requestedIds)
-        .is('deleted_at', null);
-
-    if (error) throw error;
-
-    const foundIds = new Set(profiles.map(p => p.id));
-    const missingIds = requestedIds.filter(id => !foundIds.has(id));
-
-    if (missingIds.length > 0) {
-        // Use 404 to avoid profile enumeration
-        const err = new Error('One or more profiles not found.');
-        err.statusCode = 404;
+    const requested = profileIdsParam.split(',').map(s => s.trim()).filter(Boolean);
+    const invalid = requested.filter(id => !ownedIds.has(id));
+    if (invalid.length > 0) {
+        const err = new Error('One or more profile_ids do not belong to this account.');
+        err.statusCode = 403;
         throw err;
     }
-
-    return requestedIds;
+    return requested;
 }
 
-module.exports = { resolveProfileIds };
+// Verifies a single profile_id belongs to userId. Returns true/false —
+// does not throw, so the caller decides whether to respond 404 (to avoid
+// leaking existence of another user's data, matching this codebase's
+// existing pattern for cross-account access) or something else.
+async function verifyProfileOwnership(userId, profileId) {
+    const profile = await profileService.findProfileForUser(userId, profileId);
+    return !!profile;
+}
+
+module.exports = { resolveProfileIds, verifyProfileOwnership };

@@ -1,10 +1,18 @@
 const calendarEventService = require('../services/calendarEventService');
 const binService = require('../services/binService');
+const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
 
 async function listCalendarEvents(req, res) {
+    let profileIds;
+    try {
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+
     try {
         const { start, end } = req.query;
-        const events = await calendarEventService.listCalendarEvents(req.profileId, { start, end });
+        const events = await calendarEventService.listCalendarEventsForProfiles(profileIds, { start, end });
         return res.status(200).json({ events });
     } catch (err) {
         console.error('List calendar events error:', err);
@@ -14,8 +22,12 @@ async function listCalendarEvents(req, res) {
 
 async function getCalendarEvent(req, res) {
     try {
-        const event = await calendarEventService.getCalendarEventById(req.profileId, req.params.id);
+        const event = await calendarEventService.getCalendarEventByIdOnly(req.params.id);
         if (!event) {
+            return res.status(404).json({ error: 'Calendar event not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, event.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Calendar event not found.' });
         }
         return res.status(200).json({ event });
@@ -36,6 +48,15 @@ async function createCalendarEvent(req, res) {
     }
     if (ends_at && new Date(ends_at) <= new Date(starts_at)) {
         return res.status(400).json({ error: 'ends_at must be after starts_at.' });
+    }
+
+    // Optional: if profile_id is explicitly provided in body, verify ownership
+    const targetProfileId = req.body.profile_id ?? req.profileId;
+    if (req.body.profile_id !== undefined) {
+        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
+        if (!owns) {
+            return res.status(404).json({ error: 'Cannot create calendar event: profile not owned by user.' });
+        }
     }
 
     try {
@@ -68,8 +89,12 @@ async function updateCalendarEvent(req, res) {
     // Need to check against existing values if only one is being updated
     if (fields.starts_at || fields.ends_at) {
         try {
-            const existingEvent = await calendarEventService.getCalendarEventById(req.profileId, req.params.id);
+            const existingEvent = await calendarEventService.getCalendarEventByIdOnly(req.params.id);
             if (!existingEvent) {
+                return res.status(404).json({ error: 'Calendar event not found.' });
+            }
+            const owns = await verifyProfileOwnership(req.userId, existingEvent.profile_id);
+            if (!owns) {
                 return res.status(404).json({ error: 'Calendar event not found.' });
             }
             const startsAt = fields.starts_at ?? existingEvent.starts_at;
@@ -84,15 +109,20 @@ async function updateCalendarEvent(req, res) {
     }
 
     try {
-        const event = await calendarEventService.updateCalendarEvent(
-            req.profileId,
-            req.params.id,
-            fields
-        );
+        const event = await calendarEventService.getCalendarEventByIdOnly(req.params.id);
         if (!event) {
             return res.status(404).json({ error: 'Calendar event not found.' });
         }
-        return res.status(200).json({ event });
+        const owns = await verifyProfileOwnership(req.userId, event.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Calendar event not found.' });
+        }
+        const updated = await calendarEventService.updateCalendarEvent(
+            event.profile_id,
+            req.params.id,
+            fields
+        );
+        return res.status(200).json({ event: updated });
     } catch (err) {
         console.error('Update calendar event error:', err);
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -101,14 +131,23 @@ async function updateCalendarEvent(req, res) {
 
 async function deleteCalendarEvent(req, res) {
     try {
-        const event = await calendarEventService.softDeleteCalendarEvent(
-            req.profileId,
-            req.params.id
-        );
+        const event = await calendarEventService.getCalendarEventByIdOnly(req.params.id);
         if (!event) {
             return res.status(404).json({ error: 'Calendar event not found.' });
         }
-        await binService.logDeletion(req.profileId, 'calendar_event', event.id);
+        const owns = await verifyProfileOwnership(req.userId, event.profile_id);
+        if (!owns) {
+            return res.status(404).json({ error: 'Calendar event not found.' });
+        }
+
+        const deleted = await calendarEventService.softDeleteCalendarEvent(
+            event.profile_id,
+            req.params.id
+        );
+        if (!deleted) {
+            return res.status(404).json({ error: 'Calendar event not found.' });
+        }
+        await binService.logDeletion(event.profile_id, 'calendar_event', event.id);
         return res.status(204).send();
     } catch (err) {
         console.error('Delete calendar event error:', err);

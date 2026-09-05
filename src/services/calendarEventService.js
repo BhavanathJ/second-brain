@@ -128,9 +128,20 @@ async function listCalendarEventsForProfiles(profileIds, { start, end } = {}) {
     return data;
 }
 
+async function getCalendarEventByIdOnly(eventId) {
+    const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('id', eventId)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     listCalendarEvents,
-    listCalendarEventsForProfiles,
     getCalendarEventById,
     createCalendarEvent,
     updateCalendarEvent,
@@ -138,4 +149,6 @@ module.exports = {
     restoreCalendarEvent,
     hardDeleteCalendarEvent,
     getEventsForRange,
+    listCalendarEventsForProfiles,
+    getCalendarEventByIdOnly,
 };

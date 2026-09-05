@@ -118,8 +118,12 @@ export async function initProfileFilter(onChange) {
         onChange(selectedProfileIds);
     }
 
-    // Initial render
+    // Initial render, AND notify the caller of the persisted selection —
+    // otherwise the calling page's own state never learns about a
+    // persisted filter until the user clicks a chip again, even though
+    // the chip bar itself displays the correct persisted selection.
     render();
+    onChange(selectedProfileIds);
 
     // Return cleanup function
     return {

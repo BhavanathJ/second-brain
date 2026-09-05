@@ -103,6 +103,35 @@ async function hardDeleteTask(profileId, taskId) {
     if (error) throw error;
 }
 
+async function listTasksForProfiles(profileIds, { urgent, important, status } = {}) {
+    let query = supabase
+        .from('tasks')
+        .select('*')
+        .in('profile_id', profileIds)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+    if (urgent !== undefined) query = query.eq('urgent', urgent);
+    if (important !== undefined) query = query.eq('important', important);
+    if (status !== undefined) query = query.eq('status', status);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+async function getTaskByIdOnly(taskId) {
+    const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     listTasks,
     getTaskById,
@@ -111,4 +140,6 @@ module.exports = {
     softDeleteTask,
     restoreTask,
     hardDeleteTask,
+    listTasksForProfiles,
+    getTaskByIdOnly,
 };

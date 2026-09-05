@@ -35,8 +35,9 @@ export async function initProfileFilter(onChange) {
         return { destroy: () => {} };
     }
 
-    // Selection state
-    let selectedProfileIds = null; // null = active profile only, 'all' = all, array = specific profiles
+    // Selection state - persist across page navigation
+    const FILTER_STORAGE_KEY = 'profileFilterSelection';
+    let selectedProfileIds = loadPersistedSelection();
 
     // Get active profile ID from token
     const token = localStorage.getItem('accessToken');
@@ -58,7 +59,7 @@ export async function initProfileFilter(onChange) {
         const isAllSelected = selectedProfileIds === 'all';
         chips.push(`
             <button type="button" class="profile-filter-chip${isAllSelected ? ' active' : ''}" data-profile-id="all">
-                <span class="profile-filter-chip-dot" style="background: var(--color-primary);"></span>
+                <span class="profile-filter-chip-dot" style="background: var(--sb-ink);"></span>
                 <span>All profiles</span>
             </button>
         `);
@@ -112,6 +113,7 @@ export async function initProfileFilter(onChange) {
             }
         }
 
+        persistSelection(selectedProfileIds);
         render();
         onChange(selectedProfileIds);
     }
@@ -132,6 +134,20 @@ export async function initProfileFilter(onChange) {
             render();
         },
     };
+}
+
+function loadPersistedSelection() {
+    const raw = localStorage.getItem('profileFilterSelection');
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+function persistSelection(selection) {
+    localStorage.setItem('profileFilterSelection', JSON.stringify(selection));
 }
 
 function escapeHtml(str) {

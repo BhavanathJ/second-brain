@@ -1,4 +1,5 @@
 const settingsService = require('../services/settingsService');
+const authService = require('../services/authService');
 const { normalizeTimezone, isValidTimezone } = require('../utils/timezone');
 
 const VALID_THEMES = ['light', 'dark', 'system'];
@@ -11,7 +12,14 @@ async function getSettings(req, res) {
         if (!settings) {
             return res.status(404).json({ error: 'Settings not found for this profile.' });
         }
-        return res.status(200).json({ settings });
+        let user;
+        if (req.userId) {
+            user = await authService.findUserById(req.userId);
+        }
+        return res.status(200).json({
+            settings,
+            ...(user ? { user: { email: user.email, username: user.username } } : {}),
+        });
     } catch (err) {
         console.error('Get settings error:', err);
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });

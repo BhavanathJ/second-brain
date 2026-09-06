@@ -153,6 +153,10 @@ function wireDayCellClicks() {
     });
 }
 
+function sortByDone(items, isDoneFn) {
+    return [...items].sort((a, b) => (isDoneFn(a) ? 1 : 0) - (isDoneFn(b) ? 1 : 0));
+}
+
 function renderDayPanel() {
     const panel = document.getElementById('dayPanel');
     if (!selectedDateStr) {
@@ -164,39 +168,164 @@ function renderDayPanel() {
     const label = labelForDate(selectedDateStr, { weekday: 'long', month: 'long', day: 'numeric' });
 
     const rows = items ? [
-        ...items.tasks.map(t => ({ badge: 'task', title: t.title, time: t.due_at ? formatTimeWithTZ(t.due_at, timeZone, t.profile_timezone) : '', deletable: false, profile_id: t.profile_id })),
-        ...items.events.map(e => ({ badge: 'event', title: e.title, time: formatTimeWithTZ(e.starts_at, timeZone, e.profile_timezone), deletable: true, id: e.id, profile_id: e.profile_id })),
-        ...items.reminders.map(r => ({ badge: 'reminder', title: r.title, time: formatTimeWithTZ(r.remind_at, timeZone, r.profile_timezone), deletable: false, profile_id: r.profile_id })),
-        ...items.habits.map(h => ({ badge: 'habit', title: h.habits?.title ?? 'Habit', time: '✓ done', deletable: false, profile_id: h.profile_id })),
+        ...items.tasks.map(t => ({
+            badge: 'task',
+            title: t.title,
+            time: t.due_at ? formatTimeWithTZ(t.due_at, timeZone, t.profile_timezone) : '',
+            id: t.id,
+            status: t.status,
+            is_done: t.status === 'done',
+            profile_id: t.profile_id
+        })),
+        ...items.events.map(e => ({
+            badge: 'event',
+            title: e.title,
+            time: formatTimeWithTZ(e.starts_at, timeZone, e.profile_timezone),
+            id: e.id,
+            is_done: false,
+            profile_id: e.profile_id
+        })),
+        ...items.reminders.map(r => ({
+            badge: 'reminder',
+            title: r.title,
+            time: formatTimeWithTZ(r.remind_at, timeZone, r.profile_timezone),
+            id: r.id,
+            is_done: !!r.is_done,
+            profile_id: r.profile_id
+        })),
+        ...items.habits.map(h => ({
+            badge: 'habit',
+            title: h.habits?.title ?? 'Habit',
+            time: '✓ done',
+            is_done: false,
+            profile_id: h.profile_id
+        })),
     ] : [];
+
+    const sortedRows = sortByDone(rows, r => r.is_done);
 
     panel.innerHTML = `
     <div class="dash-section-title">${label}</div>
-    ${rows.length === 0 ? '<div class="dash-empty">Nothing on this day.</div>' : rows.map(r => `
-      <div class="cal-panel-item">
-        <span class="cal-panel-badge ${r.badge}">${r.badge}</span>
-        <span class="flex-grow-1">${escapeHtml(r.title)}${renderProfileBadge(r)}</span>
-        <span class="dash-item-time">${r.time}</span>
-        ${r.deletable ? `<button class="btn btn-outline-danger btn-sm cal-event-delete-btn" data-id="${r.id}">Delete</button>` : ''}
-      </div>
-    `).join('')}
+    ${sortedRows.length === 0 ? '<div class="dash-empty">Nothing on this day.</div>' : sortedRows.map(r => {
+        const isDone = !!r.is_done;
+        let checkbox = '';
+        if (r.badge === 'task') {
+            checkbox = `<input type="checkbox" class="form-check-input task-done-checkbox" data-id="${r.id}" ${isDone ? 'checked' : ''} />`;
+        } else if (r.badge === 'reminder') {
+            checkbox = `<input type="checkbox" class="form-check-input reminder-done-checkbox" data-id="${r.id}" ${isDone ? 'checked' : ''} />`;
+        }
+
+        let deleteBtn = '';
+        if (r.badge === 'task') {
+            deleteBtn = `<button class="btn btn-outline-danger btn-sm task-delete-btn" data-id="${r.id}">Delete</button>`;
+        } else if (r.badge === 'event') {
+            deleteBtn = `<button class="btn btn-outline-danger btn-sm event-delete-btn" data-id="${r.id}">Delete</button>`;
+        } else if (r.badge === 'reminder') {
+            deleteBtn = `<button class="btn btn-outline-danger btn-sm reminder-delete-btn" data-id="${r.id}">Delete</button>`;
+        }
+
+        return `
+        <div class="cal-panel-item">
+          <span class="cal-panel-badge ${r.badge}">${r.badge}</span>
+          ${checkbox}
+          <span class="flex-grow-1 cal-item-title${isDone ? ' dash-habit-done' : ''}">
+            ${escapeHtml(r.title)}${renderProfileBadge(r)}
+          </span>
+          <span class="dash-item-time">${r.time}</span>
+          ${deleteBtn}
+        </div>
+        `;
+    }).join('')}
   `;
 
-    wireDeleteButtons();
+    wireDayPanelEvents();
 }
 
-function wireDeleteButtons() {
-    document.querySelectorAll('.cal-event-delete-btn').forEach(btn => {
+function wireDayPanelEvents() {
+    // Task checkbox
+    document.querySelectorAll('.task-done-checkbox').forEach(cb => {
+        cb.addEventListener('change', async () => {
+            cb.disabled = true;
+            try {
+                await apiFetch(`/tasks/${cb.dataset.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: cb.checked ? 'done' : 'pending' }),
+                });
+                await loadView();
+            } catch (err) {
+                showToast('Failed to update task: ' + err.message);
+                cb.disabled = false;
+            }
+        });
+    });
+
+    // Reminder checkbox
+    document.querySelectorAll('.reminder-done-checkbox').forEach(cb => {
+        cb.addEventListener('change', async () => {
+            cb.disabled = true;
+            try {
+                await apiFetch(`/reminders/${cb.dataset.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ is_done: cb.checked }),
+                });
+                await loadView();
+            } catch (err) {
+                showToast('Failed to update reminder: ' + err.message);
+                cb.disabled = false;
+            }
+        });
+    });
+
+    // Task delete
+    document.querySelectorAll('.task-delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            const ok = await confirmAction('Delete this calendar event?');
+            const ok = await confirmAction('Move this task to Bin?');
             if (!ok) return;
+            btn.disabled = true;
+            try {
+                await apiFetch(`/tasks/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Task moved to Bin', 'success');
+                await loadView();
+            } catch (err) {
+                showToast('Failed to delete task: ' + err.message);
+                btn.disabled = false;
+            }
+        });
+    });
+
+    // Event delete
+    document.querySelectorAll('.event-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const ok = await confirmAction('Delete this event?');
+            if (!ok) return;
+            btn.disabled = true;
             try {
                 await apiFetch(`/calendar-events/${btn.dataset.id}`, { method: 'DELETE' });
                 showToast('Event deleted', 'success');
                 await loadView();
             } catch (err) {
                 showToast('Failed to delete event: ' + err.message);
+                btn.disabled = false;
+            }
+        });
+    });
+
+    // Reminder delete
+    document.querySelectorAll('.reminder-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const ok = await confirmAction('Delete this reminder?');
+            if (!ok) return;
+            btn.disabled = true;
+            try {
+                await apiFetch(`/reminders/${btn.dataset.id}`, { method: 'DELETE' });
+                showToast('Reminder deleted', 'success');
+                await loadView();
+            } catch (err) {
+                showToast('Failed to delete reminder: ' + err.message);
+                btn.disabled = false;
             }
         });
     });

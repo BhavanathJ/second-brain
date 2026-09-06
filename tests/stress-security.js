@@ -24,7 +24,12 @@ async function call(fn, overrides) {
 
 async function seedUserWithProfile(email, username, password, profileName) {
   const passwordHash = await hashPassword(password);
-  const user = mock.seed('users', { email, username, password_hash: passwordHash });
+  // Fixed id 'u1' matches makeReqRes's default userId, so ownership
+  // checks (verifyProfileOwnership) succeed for this file's calls that
+  // don't explicitly override userId. This exact fix has been lost
+  // during file regeneration multiple times before — do not remove it
+  // in any future edit to this function.
+  const user = mock.seed('users', { id: 'u1', email, username, password_hash: passwordHash });
   const profile = mock.seed('profiles', { user_id: user.id, name: profileName });
   await settingsService.createDefaultSettings(profile.id, TZ);
   return { user, profile, passwordHash };

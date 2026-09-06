@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bin — Second Brain</title>
+    <title>403 — Forbidden</title>
     <!-- Default favicon (light) — updated by pre-paint script before first paint -->
-    <link id="favicon" rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link id="favicon" rel="icon" type="image/svg+xml" href="favicon.svg" />
     <script>
         (function () {
             var pref = localStorage.getItem('theme') || 'system';
@@ -16,28 +16,33 @@
             document.documentElement.setAttribute('data-theme', resolved);
             // Update favicon href before first paint to match resolved theme
             var favicon = document.getElementById('favicon');
-            if (favicon) favicon.href = resolved === 'dark' ? '../favicon-dark.svg' : '../favicon.svg';
+            if (favicon) favicon.href = resolved === 'dark' ? 'favicon-dark.svg' : 'favicon.svg';
         })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="../css/app.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <style>
+        .error-heading {
+            font-family: var(--sb-font);
+            font-size: 6rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+    </style>
 </head>
 
 <body>
-    <div id="app-nav"></div>
-    <div id="profileFilterContainer"></div>
-
-    <main class="bin-page">
-        <h1 class="h4 mb-3">Bin</h1>
-        <p class="text-muted small mb-3">Items are permanently deleted 30 days after being moved here.</p>
-        <div id="binList"></div>
+    <main class="d-flex align-items-center justify-content-center min-vh-100 p-3 text-center">
+        <div>
+            <h1 class="error-heading">403</h1>
+            <p class="lead mb-4 text-muted">You don't have permission to view this.</p>
+            <a href="/pages/dashboard.html" class="btn btn-primary">Go to Dashboard</a>
+        </div>
     </main>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="../js/pages/bin.js"></script>
 </body>
 
 </html>

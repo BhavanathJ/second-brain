@@ -36,6 +36,11 @@ export async function apiFetch(endpoint, options = {}) {
         res = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
     }
 
+    if (res.status === 403) {
+        window.location.href = '/403.html';
+        return Promise.reject(new Error('Forbidden'));
+    }
+
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Request failed: ${res.status}`);

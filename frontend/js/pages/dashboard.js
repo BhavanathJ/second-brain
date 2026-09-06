@@ -110,6 +110,21 @@ function renderOverdue(tasks, timeZone) {
   `;
 }
 
+function renderNoDeadline(tasks, timeZone) {
+    const section = document.getElementById('noDeadlineTasks');
+    if (!section) return;
+    if (tasks.length === 0) {
+        section.innerHTML = renderEmpty('tasks without a deadline');
+        return;
+    }
+    section.innerHTML = tasks.map(t => `
+    <div class="dash-item">
+      <span class="dash-item-title">${escapeHtml(t.title)}${renderProfileBadge(t)}</span>
+      <span class="dash-item-time text-muted">No deadline</span>
+    </div>
+  `).join('');
+}
+
 function renderMixedList(mountId, { tasks = [], reminders = [], calendar_events = [] }, timeZone) {
     const mount = document.getElementById(mountId);
     const items = [
@@ -185,6 +200,7 @@ async function loadDashboard(timeZone) {
         ...data.next_7_days.reminders,
         ...data.next_7_days.calendar_events,
         ...data.overdue.tasks,
+        ...(data.no_deadline?.tasks || []),
     ];
 
     // Cache profiles for badge rendering
@@ -200,6 +216,7 @@ async function loadDashboard(timeZone) {
     }
 
     renderOverdue(data.overdue.tasks, timeZone);
+    renderNoDeadline(data.no_deadline?.tasks || [], timeZone);
 
     document.getElementById('todayTasks').innerHTML = renderTasks(data.today.tasks, timeZone);
     document.getElementById('todayHabits').innerHTML = renderHabits(data.today.habits);

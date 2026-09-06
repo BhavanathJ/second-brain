@@ -4,6 +4,7 @@ const noteService = require('../services/noteService');
 const reminderService = require('../services/reminderService');
 const habitService = require('../services/habitService');
 const calendarEventService = require('../services/calendarEventService');
+const { resolveProfileIds } = require('../utils/profileAccess');
 
 // Option B restore map — add one line here whenever a new feature is built.
 const entityHandlers = {
@@ -31,8 +32,16 @@ const entityHandlers = {
 };
 
 async function listBin(req, res) {
+    let profileIds;
     try {
-        const entries = await binService.listBinEntries(req.profileId);
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+    try {
+        const entries = profileIds.length === 1 && profileIds[0] === req.profileId
+            ? await binService.listBinEntries(req.profileId)
+            : await binService.listBinEntriesForProfiles(profileIds);
         return res.status(200).json({ entries });
     } catch (err) {
         console.error('List bin error:', err);

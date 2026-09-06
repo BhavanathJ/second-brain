@@ -66,8 +66,8 @@ function bucketData(data) {
 function dotsHTML(items) {
     if (!items) return '';
     return ['tasks', 'events', 'reminders', 'habits']
-        .filter(type => items[type].length > 0)
-        .map(type => `<span class="cal-dot ${type.slice(0, -1)}"></span>`).join('');
+        .flatMap(type => items[type].map(() => `<span class="cal-dot ${type.slice(0, -1)}"></span>`))
+        .join('');
 }
 
 function renderProfileBadge(item) {
@@ -164,10 +164,10 @@ function renderDayPanel() {
     const label = labelForDate(selectedDateStr, { weekday: 'long', month: 'long', day: 'numeric' });
 
     const rows = items ? [
-        ...items.tasks.map(t => ({ badge: 'task', title: t.title, time: t.due_at ? formatTimeWithTZ(t.due_at, timeZone, t.profile_timezone) : '', deletable: false })),
-        ...items.events.map(e => ({ badge: 'event', title: e.title, time: formatTimeWithTZ(e.starts_at, timeZone, e.profile_timezone), deletable: true, id: e.id })),
-        ...items.reminders.map(r => ({ badge: 'reminder', title: r.title, time: formatTimeWithTZ(r.remind_at, timeZone, r.profile_timezone), deletable: false })),
-        ...items.habits.map(h => ({ badge: 'habit', title: h.habits?.title ?? 'Habit', time: '✓ done', deletable: false })),
+        ...items.tasks.map(t => ({ badge: 'task', title: t.title, time: t.due_at ? formatTimeWithTZ(t.due_at, timeZone, t.profile_timezone) : '', deletable: false, profile_id: t.profile_id })),
+        ...items.events.map(e => ({ badge: 'event', title: e.title, time: formatTimeWithTZ(e.starts_at, timeZone, e.profile_timezone), deletable: true, id: e.id, profile_id: e.profile_id })),
+        ...items.reminders.map(r => ({ badge: 'reminder', title: r.title, time: formatTimeWithTZ(r.remind_at, timeZone, r.profile_timezone), deletable: false, profile_id: r.profile_id })),
+        ...items.habits.map(h => ({ badge: 'habit', title: h.habits?.title ?? 'Habit', time: '✓ done', deletable: false, profile_id: h.profile_id })),
     ] : [];
 
     panel.innerHTML = `

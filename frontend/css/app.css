@@ -923,6 +923,36 @@ a:hover {
     border: 1px solid var(--sb-ok);
 }
 
+/* Calendar Legend */
+.cal-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    font-size: 0.72rem;
+    color: var(--sb-muted);
+}
+
+.cal-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.cal-legend-item .cal-dot {
+    flex-shrink: 0;
+}
+
+@media (max-width: 576px) {
+    .cal-legend {
+        justify-content: center;
+        gap: 0.75rem;
+    }
+}
+
 .cal-day-panel {
     background: var(--sb-surface);
     border: 1px solid var(--sb-border);

@@ -63,6 +63,47 @@ async function listBinEntries(profileId) {
     }));
 }
 
+async function listBinEntriesForProfiles(profileIds) {
+    const { data, error } = await supabase
+        .from('bin_entries')
+        .select('*')
+        .in('profile_id', profileIds)
+        .order('deleted_at', { ascending: false });
+
+    if (error) throw error;
+
+    const grouped = {};
+    for (const entry of data) {
+        if (!grouped[entry.entity_type]) grouped[entry.entity_type] = [];
+        grouped[entry.entity_type].push(entry.entity_id);
+    }
+
+    const labelMap = {};
+
+    await Promise.all(
+        Object.entries(grouped).map(async ([entityType, ids]) => {
+            const config = ENTITY_LABEL_CONFIG[entityType];
+            if (!config) return;
+            const { data: rows, error: rowsError } = await supabase
+                .from(config.table)
+                .select(`id, ${config.column}`)
+                .in('id', ids);
+            if (rowsError) throw rowsError;
+            rows.forEach(row => {
+                labelMap[row.id] = row[config.column];
+            });
+        })
+    );
+
+    return data.map(entry => ({
+        ...entry,
+        // Truncate — notes' content can be long, titles rarely are.
+        // Falls back gracefully if the underlying row is somehow gone
+        // (e.g. a race with the purge cron) rather than showing undefined.
+        label: (labelMap[entry.entity_id] ?? '(content unavailable)').slice(0, 100),
+    }));
+}
+
 async function getBinEntryById(profileId, binEntryId) {
     const { data, error } = await supabase
         .from('bin_entries')
@@ -98,6 +139,7 @@ async function getExpiredBinEntries() {
 module.exports = {
     logDeletion,
     listBinEntries,
+    listBinEntriesForProfiles,
     getBinEntryById,
     removeBinEntry,
     getExpiredBinEntries,

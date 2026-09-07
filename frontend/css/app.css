@@ -135,15 +135,6 @@
 }
 
 /* Navbar toggler (hamburger menu) styles for mobile */
-.navbar-toggler {
-    padding: 0.35rem 0.55rem;
-    border: var(--sb-border-width) solid var(--sb-border);
-    border-radius: var(--sb-radius-sm);
-    background: var(--sb-surface);
-    box-shadow: 2px 2px 0px var(--sb-shadow-color);
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-
 .navbar-toggler:hover {
     transform: translate(-1px, -1px);
     box-shadow: 3px 3px 0px var(--sb-shadow-color);
@@ -336,37 +327,6 @@
 .reminder-actions {
     display: flex;
     gap: 0.4rem;
-}
-
-.bin-page {
-    padding: 1.5rem 1rem;
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.bin-item-body {
-    flex: 1;
-    min-width: 0;
-}
-
-.bin-item-label {
-    font-size: 0.92rem;
-    font-weight: 600;
-    margin-bottom: 0.2rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.bin-item-meta {
-    font-size: 0.72rem;
-    color: var(--sb-muted);
-}
-
-.bin-item-actions {
-    display: flex;
-    gap: 0.4rem;
-    flex-shrink: 0;
 }
 
 .cal-legend {
@@ -1521,6 +1481,7 @@ a:hover {
     border-bottom: 1.5px dashed var(--sb-border-light);
     font-size: 0.88rem;
     font-weight: 500;
+    animation: fadeInUp 0.2s ease-out;
 }
 
 .cal-panel-item:last-child {

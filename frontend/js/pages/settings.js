@@ -4,7 +4,6 @@ import { showToast } from '../toast.js';
 import { resolveTheme, updateFavicon } from '../themeUtils.js';
 import { getOffsetMinutes } from '../timeUtils.js';
 import { getTimezoneDisplayLabel, getFriendlyTimezoneName, normalizeTimezone } from '../timezoneNames.js';
-import { saveTokens, getAccessToken } from '../auth.js';
 
 let renameProfileModal = null;
 let deleteProfileModal = null;
@@ -385,7 +384,8 @@ async function handleConfirmUsername() {
         });
 
         if (res.accessToken && res.refreshToken) {
-            saveTokens(res.accessToken, res.refreshToken);
+            localStorage.setItem('accessToken', res.accessToken);
+            localStorage.setItem('refreshToken', res.refreshToken);
         }
 
         const navUsername = document.querySelector('.nav-username');

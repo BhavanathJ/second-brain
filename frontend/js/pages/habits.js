@@ -3,63 +3,33 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
-function getLocalDateString(timeZone, date = new Date()) {
-    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-}
-
-function addDays(dateStr, days) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const dt = new Date(Date.UTC(y, m - 1, d + days));
-    return dt.toISOString().split('T')[0];
-}
+import { getLocalDateString, addDays, getLocalWeekStartDateString } from '../timeUtils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 function dayLabel(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })[0];
 }
 
-function formatDateWithTZ(isoString, timeZone, itemTimeZone) {
-    const base = formatDate(isoString, timeZone);
-    if (!itemTimeZone || itemTimeZone === timeZone) return base;
-    return `${base} (${itemTimeZone})`;
-}
-
-function formatDate(isoString, timeZone) {
-    if (!isoString) return '';
-    return new Date(isoString).toLocaleDateString('en-US', {
-        timeZone,
-        month: 'short',
-        day: 'numeric',
-    });
-}
-
 let timeZone = 'UTC';
+let weekStartsOn = 0;
 let habits = [];
-let last7Days = [];
+let weekDays = [];
 const modalEl = document.getElementById('habitModal');
 const modal = new bootstrap.Modal(modalEl);
 let currentProfileFilter = null;
 let profilesCache = [];
 
+// Only this page's own "should a badge show at all" rule stays local —
+// multiple profiles' habits must actually be in view. The markup itself
+// comes from the shared renderer in utils.js.
 function renderProfileBadge(item) {
     const profileIds = [...new Set(habits.map(h => h.profile_id).filter(Boolean))];
     const showBadge = profileIds.length > 1 && item.profile_id;
-    const profile = profilesCache.find(p => p.id === item.profile_id);
-    if (!showBadge || !profile) return '';
-    return `
-        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
-            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
-            ${escapeHtml(profile.name)}
-        </span>
-    `;
+    if (!showBadge) return '';
+    return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
+
 
 async function loadHabits() {
     let url = '/habits';
@@ -73,10 +43,13 @@ async function loadHabits() {
     habits = fetchedHabits;
 
     const todayStr = getLocalDateString(timeZone);
-    last7Days = Array.from({ length: 7 }, (_, i) => addDays(todayStr, i - 6));
+    // Calendar-aligned week (honors week_starts_on), not a rolling
+    // trailing-7-days window — same helper calendar.js already uses.
+    const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, todayStr);
+    weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStartStr, i));
 
     const logsPerHabit = await Promise.all(
-        habits.map(h => apiFetch(`/habits/${h.id}/logs?start=${last7Days[0]}&end=${last7Days[6]}`))
+        habits.map(h => apiFetch(`/habits/${h.id}/logs?start=${weekDays[0]}&end=${weekDays[6]}`))
     );
 
     habits = habits.map((h, i) => ({
@@ -103,7 +76,7 @@ function renderDayGrid(habit) {
     const todayStr = getLocalDateString(timeZone);
     return `
     <div class="habit-week-grid">
-      ${last7Days.map(dateStr => {
+      ${weekDays.map(dateStr => {
         const isDone = habit.loggedDates.has(dateStr);
         const isToday = dateStr === todayStr;
         return `<div class="habit-day-cell${isDone ? ' done' : ''}${isToday ? ' today' : ''}"
@@ -231,8 +204,9 @@ async function main() {
     try {
         const { settings } = await apiFetch('/settings');
         timeZone = settings.timezone;
+        weekStartsOn = settings.week_starts_on;
     } catch (err) {
-        console.error('Failed to load settings, defaulting habit dates to UTC:', err);
+        console.error('Failed to load settings, defaulting habit dates to UTC/Sunday-start:', err);
     }
 
     // Initialize profile filter

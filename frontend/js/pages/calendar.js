@@ -6,23 +6,9 @@ import { initProfileFilter } from '../profileFilter.js';
 import {
     getLocalDateString, addDays, addMonths,
     getLocalMonthBounds, getLocalWeekBounds, getLocalDayBounds,
+    formatTimeWithTZ,
 } from '../timeUtils.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
-function formatTime(isoString, timeZone) {
-    return new Date(isoString).toLocaleTimeString('en-US', { timeZone, hour: 'numeric', minute: '2-digit' });
-}
-
-function formatTimeWithTZ(isoString, timeZone, itemTimeZone) {
-    const base = formatTime(isoString, timeZone);
-    if (!itemTimeZone || itemTimeZone === timeZone) return base;
-    return `${base} (${itemTimeZone})`;
-}
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 function labelForDate(dateStr, opts) {
     return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
@@ -76,14 +62,8 @@ function renderProfileBadge(item) {
     );
     const profileIds = [...new Set(allItems.map(i => i.profile_id).filter(Boolean))];
     const showBadge = profileIds.length > 1 && item.profile_id;
-    const profile = profilesCache.find(p => p.id === item.profile_id);
-    if (!showBadge || !profile) return '';
-    return `
-        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
-            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
-            ${escapeHtml(profile.name)}
-        </span>
-    `;
+    if (!showBadge) return '';
+    return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
 
 function renderMonthGrid() {

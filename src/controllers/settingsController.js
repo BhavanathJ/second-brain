@@ -4,7 +4,6 @@ const { normalizeTimezone, isValidTimezone } = require('../utils/timezone');
 
 const VALID_THEMES = ['light', 'dark', 'system'];
 const VALID_WEEK_STARTS = [0, 1]; // 0 = Sunday, 1 = Monday
-const VALID_DESIGN_SYSTEMS = ['signal', 'neo'];
 
 async function getSettings(req, res) {
     try {
@@ -27,7 +26,7 @@ async function getSettings(req, res) {
 }
 
 async function updateSettings(req, res) {
-    const allowedFields = ['timezone', 'theme', 'week_starts_on', 'design_system'];
+    const allowedFields = ['timezone', 'theme', 'week_starts_on'];
     const fields = {};
 
     for (const key of allowedFields) {
@@ -54,11 +53,6 @@ async function updateSettings(req, res) {
         }
         // Store the normalized (modern) version
         fields.timezone = normalizeTimezone(fields.timezone);
-    }
-    if (fields.design_system !== undefined) {
-        if (!fields.design_system || typeof fields.design_system !== 'string' || !VALID_DESIGN_SYSTEMS.includes(fields.design_system)) {
-            return res.status(400).json({ error: `Invalid design_system. Must be one of: ${VALID_DESIGN_SYSTEMS.join(', ')}.` });
-        }
     }
 
     try {

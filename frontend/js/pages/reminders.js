@@ -3,24 +3,8 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
-function formatDateTime(isoString, timeZone) {
-    return new Date(isoString).toLocaleString('en-US', {
-        timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
-}
-
-function formatDateTimeWithTZ(isoString, timeZone, itemTimeZone) {
-    const base = formatDateTime(isoString, timeZone);
-    if (!itemTimeZone || itemTimeZone === timeZone) return base;
-    return `${base} (${itemTimeZone})`;
-}
+import { formatDateTimeWithTZ } from '../timeUtils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 function isoToLocalInput(isoString) {
     if (!isoString) return '';
@@ -39,14 +23,8 @@ let profilesCache = [];
 function renderProfileBadge(item) {
     const profileIds = [...new Set(allReminders.map(r => r.profile_id).filter(Boolean))];
     const showBadge = profileIds.length > 1 && item.profile_id;
-    const profile = profilesCache.find(p => p.id === item.profile_id);
-    if (!showBadge || !profile) return '';
-    return `
-        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
-            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
-            ${escapeHtml(profile.name)}
-        </span>
-    `;
+    if (!showBadge) return '';
+    return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
 
 function renderReminderItem(r) {

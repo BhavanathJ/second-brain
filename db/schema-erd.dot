@@ -55,7 +55,6 @@ digraph SecondBrainSchema {
       <tr><td align="left">timezone</td></tr>
       <tr><td align="left">theme</td></tr>
       <tr><td align="left">week_starts_on</td></tr>
-      <tr><td align="left">design_system</td></tr>
       <tr><td align="left">updated_at</td></tr>
     </table>>];
 

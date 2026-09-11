@@ -3,45 +3,8 @@ import { apiFetch } from '../api.js';
 import { initProfileFilter } from '../profileFilter.js';
 import { confirmAction } from '../confirmDialog.js';
 import { showToast } from '../toast.js';
-
-// Basic HTML-escaping for any user-supplied text (task titles, note
-// content, etc.) before it goes into innerHTML — without this, a task
-// titled "<img src=x onerror=alert(1)>" would execute as real HTML.
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
-function formatTime(isoString, timeZone) {
-    if (!isoString) return '';
-    return new Date(isoString).toLocaleTimeString('en-US', {
-        timeZone,
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-}
-
-function formatDate(isoString, timeZone) {
-    if (!isoString) return '';
-    return new Date(isoString).toLocaleDateString('en-US', {
-        timeZone,
-        month: 'short',
-        day: 'numeric',
-    });
-}
-
-function formatTimeWithTZ(isoString, timeZone, itemTimeZone) {
-    const base = formatTime(isoString, timeZone);
-    if (!itemTimeZone || itemTimeZone === timeZone) return base;
-    return `${base} (${itemTimeZone})`;
-}
-
-function formatDateWithTZ(isoString, timeZone, itemTimeZone) {
-    const base = formatDate(isoString, timeZone);
-    if (!itemTimeZone || itemTimeZone === timeZone) return base;
-    return `${base} (${itemTimeZone})`;
-}
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { formatTimeWithTZ, formatDateWithTZ } from '../timeUtils.js';
 
 function renderEmpty(label) {
     return `<div class="dash-empty">No ${label} — nice.</div>`;
@@ -99,8 +62,9 @@ function renderEvents(events, timeZone) {
 // today_date — the exact local date string the SERVER computed and
 // returned alongside completed_today. Never guessed client-side.
 function renderHabits(habits) {
-    if (habits.length === 0) return renderEmpty('habits');
-    return habits.map(h => `
+    const sorted = sortByDone(habits, h => !!h.completed_today);
+    if (sorted.length === 0) return renderEmpty('habits');
+    return sorted.map(h => `
     <div class="dash-item">
       <span class="dash-item-title${h.completed_today ? ' dash-habit-done' : ''}">${escapeHtml(h.title)}${renderProfileBadge(h)}</span>
       ${h.completed_today
@@ -203,14 +167,8 @@ function renderMixedList(mountId, { tasks = [], reminders = [], calendar_events 
 function renderProfileBadge(item) {
     const profileIds = [...new Set(allItemsWithProfileId())];
     const showBadge = profileIds.length > 1 && item.profile_id;
-    const profile = profilesCache.find(p => p.id === item.profile_id);
-    if (!showBadge || !profile) return '';
-    return `
-        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
-            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
-            ${escapeHtml(profile.name)}
-        </span>
-    `;
+    if (!showBadge) return '';
+    return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
 
 let allItemsCache = [];

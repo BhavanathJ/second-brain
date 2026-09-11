@@ -1,4 +1,5 @@
 import { apiFetch } from './api.js';
+import { escapeHtml } from './utils.js';
 
 /**
  * Initializes the cross-profile filter bar.
@@ -152,10 +153,4 @@ function loadPersistedSelection() {
 
 function persistSelection(selection) {
     localStorage.setItem('profileFilterSelection', JSON.stringify(selection));
-}
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
 }

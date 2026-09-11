@@ -3,12 +3,7 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 function parseTags(input) {
     return input.split(',').map(t => t.trim()).filter(Boolean);
@@ -28,14 +23,8 @@ let profilesCache = [];
 function renderProfileBadge(item) {
     const profileIds = [...new Set(allNotes.map(n => n.profile_id).filter(Boolean))];
     const showBadge = profileIds.length > 1 && item.profile_id;
-    const profile = profilesCache.find(p => p.id === item.profile_id);
-    if (!showBadge || !profile) return '';
-    return `
-        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
-            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
-            ${escapeHtml(profile.name)}
-        </span>
-    `;
+    if (!showBadge) return '';
+    return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
 
 function renderNote(note) {

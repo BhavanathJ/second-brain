@@ -3,29 +3,8 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
-function formatDateTime(isoString, timeZone) {
-    if (!isoString) return '';
-    return new Date(isoString).toLocaleString('en-US', {
-        timeZone,
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-}
-
-function formatDateTimeWithTZ(isoString, timeZone, itemTimeZone) {
-    const base = formatDateTime(isoString, timeZone);
-    if (!itemTimeZone || itemTimeZone === timeZone) return base;
-    return `${base} (${itemTimeZone})`;
-}
+import { formatDateTimeWithTZ } from '../timeUtils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 let timeZone = 'UTC';
 let allTasks = [];
@@ -46,13 +25,9 @@ function bucketTasks(tasks) {
 function renderTaskItem(task) {
     const profileIds = [...new Set(allTasks.map(t => t.profile_id))];
     const showProfileBadge = profileIds.length > 1 && task.profile_id;
-    const profile = profilesCache.find(p => p.id === task.profile_id);
-    const profileBadge = showProfileBadge && profile ? `
-        <span class="bin-badge" style="border-color: ${profile.color}; color: ${profile.color};">
-            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${profile.color};margin-right:0.3rem;"></span>
-            ${escapeHtml(profile.name)}
-        </span>
-    ` : '';
+    const profileBadge = showProfileBadge
+        ? renderBadgeMarkup(profilesCache.find(p => p.id === task.profile_id))
+        : '';
 
     return `
     <div class="task-item${task.status === 'done' ? ' task-done' : ''}">
@@ -70,11 +45,18 @@ function renderTaskItem(task) {
   `;
 }
 
+// Stable sort: done tasks last, preserving relative order otherwise —
+// same pattern already used on the dashboard (dashboard.js sortByDone).
+function sortByDone(tasks) {
+    return [...tasks].sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
+}
+
 function renderQuadrant(mountId, tasks) {
     const mount = document.getElementById(mountId);
-    mount.innerHTML = tasks.length === 0
+    const sorted = sortByDone(tasks);
+    mount.innerHTML = sorted.length === 0
         ? '<div class="dash-empty">Nothing here.</div>'
-        : tasks.map(renderTaskItem).join('');
+        : sorted.map(renderTaskItem).join('');
 }
 
 function render() {

@@ -115,11 +115,37 @@
 }
 
 
+/* Theme-change transition — data-theme flips instantly (layout.js just
+   sets an attribute), so without this every color variable snaps with
+   no animation. Scoped to background/border/color only (not `all`) so
+   it doesn't fight the `transform` transitions already used for hover
+   effects on cards, buttons, etc. */
+body,
+.app-navbar,
+.navbar-collapse,
+.dash-card,
+.task-item,
+.habit-card,
+.note-card,
+.reminder-item,
+.bin-item,
+.profile-list-item,
+.tasks-toolbar,
+.form-control,
+.form-select,
+.modal-content,
+.habit-day-cell,
+.profile-filter-bar,
+.profile-filter-chip {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
 /* Nav controls & profile switcher styling */
 .app-profile-select,
 .app-theme-select {
     max-width: 140px;
-    font-size: 0.78rem;
+    font-family: var(--sb-font-heading);
+    font-size: 0.82rem;
     border-left: 3px solid var(--sb-border);
 }
 
@@ -128,7 +154,8 @@
 }
 
 .nav-username {
-    font-size: 0.95rem;
+    font-family: var(--sb-font-heading);
+    font-size: 1rem;
     font-weight: 700;
     color: var(--sb-ink);
     white-space: nowrap;
@@ -216,6 +243,7 @@
     background: var(--sb-bg);
     border: 1px solid var(--sb-border);
     border-radius: 999px;
+    font-family: var(--sb-font-heading);
     font-size: 0.72rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -252,6 +280,7 @@
 }
 
 .profile-filter-active-badge {
+    font-family: var(--sb-font-heading);
     font-size: 0.62rem;
     font-weight: 500;
     text-transform: none;
@@ -747,7 +776,7 @@ a:hover {
 .app-navbar {
     background: var(--sb-surface);
     border-bottom: var(--sb-border-width-lg) solid var(--sb-border);
-    padding: 0.65rem 1.25rem;
+    padding: 0.85rem 1.5rem;
     box-shadow: 0 4px 0px var(--sb-border-light);
     position: sticky;
     top: 0;
@@ -757,7 +786,7 @@ a:hover {
 .app-wordmark {
     font-family: var(--sb-font-heading);
     font-weight: 800;
-    font-size: 1.15rem;
+    font-size: 1.4rem;
     letter-spacing: -0.02em;
     color: var(--sb-ink) !important;
     text-decoration: none !important;
@@ -778,11 +807,11 @@ a:hover {
 .app-navbar .nav-link {
     font-family: var(--sb-font-heading);
     font-weight: 700;
-    font-size: 0.78rem;
+    font-size: 0.88rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--sb-muted);
-    padding: 0.4rem 0.75rem;
+    padding: 0.5rem 0.85rem;
     border-radius: var(--sb-radius-sm);
     border: 2px solid transparent;
     margin: 0 0.15rem;
@@ -844,7 +873,7 @@ a:hover {
     }
 
     .app-navbar .nav-link {
-        padding: 0.5rem 0.75rem;
+        padding: 0.6rem 0.85rem;
         border: 2px solid var(--sb-border-light);
     }
 
@@ -924,6 +953,30 @@ a:hover {
 
 .dash-overdue .dash-section-title::before {
     background: var(--sb-alert);
+}
+
+/* The generic .dash-item:hover rule (below) sets background to
+   --sb-surface-alt, which wins by source order and blanks out the red
+   card on hover. Override it here with higher specificity, using the
+   --sb-alert-hover token that already exists (and is already used for
+   .btn-danger:hover) — brighter red instead of losing the color. */
+.dash-overdue .dash-item:hover {
+    background: var(--sb-alert-hover);
+}
+
+.dash-overdue .dash-item:hover .dash-item-title,
+.dash-overdue .dash-item:hover .dash-item-time {
+    color: #FFFFFF;
+}
+
+.dash-overdue .dash-item:hover .dash-item-time {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.dash-overdue .dash-item:hover .task-delete-btn {
+    border-color: #FFFFFF;
+    color: #FFFFFF;
 }
 
 .dash-item {

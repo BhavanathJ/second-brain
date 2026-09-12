@@ -1,6 +1,6 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
-import { watchSystemTheme, applyTheme } from './themeUtils.js';
+import { watchSystemTheme, applyTheme, watchExternalThemeChanges } from './themeUtils.js';
 import { escapeHtml } from './utils.js';
 
 const NAV_ITEMS = [
@@ -146,6 +146,14 @@ async function initThemeSelect() {
     // OS event fires, so this doesn't fight an explicit Light/Dark choice.
     stopWatchingSystemTheme = watchSystemTheme(() => {
         if (currentPref === 'system') applyResolvedTheme('system');
+    });
+
+    // Cross-tab sync — if the theme was changed in another tab, follow it
+    // here too, including updating the select and the favicon.
+    watchExternalThemeChanges((newRawPref) => {
+        currentPref = newRawPref;
+        select.value = currentPref;
+        applyResolvedTheme(currentPref);
     });
 
     select.addEventListener('change', async () => {

@@ -39,6 +39,19 @@ export function watchSystemTheme(callback) {
     return () => mq.removeEventListener('change', handler);
 }
 
+// Cross-tab sync: if the theme is changed in another tab, this tab's
+// favicon/DOM should follow. Browsers only fire 'storage' in tabs OTHER
+// than the one that made the change, which is exactly the gap
+// applyTheme()/the navbar selector can't cover on their own.
+// callback receives the new raw preference ('light'/'dark'/'system').
+export function watchExternalThemeChanges(callback) {
+    const handler = (e) => {
+        if (e.key === 'theme' && e.newValue) callback(e.newValue);
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+}
+
 // Updates the favicon based on the resolved theme ('light' | 'dark').
 // This is called whenever the theme changes so the icon switches
 // instantly without a page reload.

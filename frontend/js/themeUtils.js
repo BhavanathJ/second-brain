@@ -14,6 +14,21 @@ export function resolveTheme(pref) {
     return pref;
 }
 
+// Applies a raw theme preference ('light'/'dark'/'system') everywhere
+// it needs to land: the DOM attribute CSS reads, the localStorage cache
+// the pre-paint <head> script reads before this module even loads, and
+// the favicon. Was independently reimplemented in layout.js (missing
+// the favicon step) and settings.js (had it) — this is the one place
+// now, so "apply theme" can't drift out of sync with itself again.
+export function applyTheme(rawPref) {
+    const resolved = resolveTheme(rawPref);
+    document.documentElement.setAttribute('data-theme', resolved);
+    localStorage.setItem('theme', rawPref);
+    const basePath = window.location.pathname.includes('/pages/') ? '../' : '';
+    updateFavicon(resolved, basePath);
+    return resolved;
+}
+
 // Calls `callback` whenever the OS-level color scheme changes, but
 // only while the stored preference is still 'system' — returns an
 // unsubscribe function.

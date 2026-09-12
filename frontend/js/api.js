@@ -10,14 +10,28 @@ let refreshPromise = null; // shared in-flight refresh, prevents parallel-401 ra
 // try to refresh."
 const AUTH_ENDPOINTS_NO_REFRESH = ['/auth/refresh', '/auth/login', '/auth/signup'];
 
-// Computes the correct relative path back to the login page regardless
-// of whether the current page is at the frontend root (index.html
-// itself) or one level down (pages/*.html) — a single hardcoded path
-// can't be right for both, and being wrong here causes a 404 instead
-// of an actual redirect to login.
-function loginPagePath() {
-    return window.location.pathname.includes('/pages/') ? '../index.html' : 'index.html';
+// Computes the correct relative path from the current page to a
+// top-level frontend file, regardless of whether the current page is
+// at the frontend root (index.html itself) or one level down
+// (pages/*.html) — a single hardcoded path can't be right for both,
+// and being wrong here causes a 404 instead of an actual redirect.
+function relativePagePath(filename) {
+    return window.location.pathname.includes('/pages/') ? `../${filename}` : filename;
 }
+
+function loginPagePath() {
+    return relativePagePath('index.html');
+}
+
+// The ONLY place the backend ever returns a 403 (see profileAccess.js
+// resolveProfileIds) is when the cross-profile filter bar's persisted
+// selection names a profile_id the user no longer owns — e.g. it was
+// deleted in another tab/device while still selected here. The user's
+// session is completely fine; the stale bit of state is this one
+// localStorage key. So: clear it and retry once with the default
+// scope, instead of yanking the user to a dead-end error page over a
+// one-line fix.
+let retriedAfterStaleProfileFilter = false;
 
 export async function apiFetch(endpoint, options = {}) {
     const accessToken = localStorage.getItem('accessToken');
@@ -36,8 +50,21 @@ export async function apiFetch(endpoint, options = {}) {
         res = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
     }
 
+    if (res.status === 403 && endpoint.includes('profile_ids=') && !retriedAfterStaleProfileFilter) {
+        // Self-heal: drop the stale filter selection and retry once with
+        // the default scope, rather than dead-ending on an error page for
+        // what's really just leftover localStorage pointing at a profile
+        // that's gone. See the comment above this flag's declaration.
+        retriedAfterStaleProfileFilter = true;
+        localStorage.removeItem('profileFilterSelection');
+        const cleanEndpoint = endpoint.replace(/[?&]profile_ids=[^&]*/, '').replace(/^&/, '?');
+        return apiFetch(cleanEndpoint, options);
+    }
+
     if (res.status === 403) {
-        window.location.href = '/403.html';
+        // Anything else hitting this means a genuine, unexpected
+        // forbidden — not the stale-filter case above (already handled).
+        window.location.href = relativePagePath('403.html');
         return Promise.reject(new Error('Forbidden'));
     }
 

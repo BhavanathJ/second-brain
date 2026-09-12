@@ -1,7 +1,7 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
-import { resolveTheme, updateFavicon } from '../themeUtils.js';
+import { applyTheme } from '../themeUtils.js';
 import { getOffsetMinutes } from '../timeUtils.js';
 import { getTimezoneDisplayLabel, getFriendlyTimezoneName, normalizeTimezone } from '../timezoneNames.js';
 import { escapeHtml } from '../utils.js';
@@ -193,14 +193,10 @@ async function handleSubmit(e) {
     try {
         await apiFetch('/settings', { method: 'PATCH', body: JSON.stringify(payload) });
 
-        // Resolve the raw pref (light/dark/system) to an actual display value
-        // before writing data-theme — CSS only matches "light"/"dark", so
-        // writing "system" raw would fall back to the default until reload.
-        // The RAW pref is still cached in localStorage for pre-paint theme reads.
-        const resolvedTheme = resolveTheme(payload.theme);
-        document.documentElement.setAttribute('data-theme', resolvedTheme);
-        localStorage.setItem('theme', payload.theme);
-        updateFavicon(resolvedTheme);
+        // Resolve+apply happens in one shared place (themeUtils.js) so
+        // this can't drift from the navbar's own theme control again —
+        // that's exactly what caused the favicon-not-updating bug.
+        applyTheme(payload.theme);
 
         const msg = document.getElementById('saveMsg');
         msg.classList.add('visible');

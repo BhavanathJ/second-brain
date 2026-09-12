@@ -21,28 +21,63 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
-    <style>
-        .error-heading {
-            font-family: var(--sb-font);
-            font-size: 6rem;
-            font-weight: 800;
-            line-height: 1;
-            margin-bottom: 0.5rem;
-        }
-    </style>
 </head>
 
 <body>
     <main class="d-flex align-items-center justify-content-center min-vh-100 p-3 text-center">
-        <div>
-            <h1 class="error-heading">403</h1>
-            <p class="lead mb-4 text-muted">You don't have permission to view this.</p>
-            <a href="/pages/dashboard.html" class="btn btn-primary">Go to Dashboard</a>
+        <div class="auth-card" style="max-width: 480px;">
+            <div class="text-center mb-4">
+                <h1 class="error-heading"
+                    style="font-family: var(--sb-font-heading); font-size: 6rem; font-weight: 800; line-height: 1; margin-bottom: 0.5rem; color: var(--sb-ink);">
+                    403</h1>
+                <p class="lead mb-4" style="color: var(--sb-muted); font-family: var(--sb-font-body);">You don't have
+                    permission to view this.</p>
+                <p class="text-muted small mb-4" style="font-family: var(--sb-font-mono);">Please log in or check if you
+                    have the correct permissions.</p>
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a href="../index.html" class="btn btn-primary">Log In</a>
+                    <a href="../index.html" class="btn btn-outline-primary">Go to Dashboard</a>
+                </div>
+            </div>
         </div>
     </main>
+    <script>
+        // Watch for system theme changes and update favicon when theme is 'system'
+        (function () {
+            var pref = localStorage.getItem('theme') || 'system';
+            var favicon = document.getElementById('favicon');
+
+            function updateFavicon() {
+                var resolved = pref === 'system'
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : pref;
+                if (favicon) favicon.href = resolved === 'dark' ? 'favicon-dark.svg' : 'favicon.svg';
+            }
+
+            // Listen for OS theme changes
+            if (window.matchMedia) {
+                var mq = window.matchMedia('(prefers-color-scheme: dark)');
+                if (mq.addEventListener) {
+                    mq.addEventListener('change', function () {
+                        if (pref === 'system') updateFavicon();
+                    });
+                }
+            }
+
+            // Listen for storage changes (theme changed in another tab)
+            window.addEventListener('storage', function (e) {
+                if (e.key === 'theme') {
+                    pref = e.newValue || 'system';
+                    updateFavicon();
+                }
+            });
+        })();
+    </script>
 </body>
 
 </html>

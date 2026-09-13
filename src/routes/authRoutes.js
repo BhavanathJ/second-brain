@@ -18,5 +18,6 @@ router.post('/refresh', refreshLimiter, authController.refresh);
 // Protected — must be logged in
 router.post('/logout', requireAuth, authController.logout);
 router.patch('/password', requireAuth, changePasswordLimiter, authController.changePassword);
+router.patch('/username', requireAuth, authController.updateUsername);
 
 module.exports = router;

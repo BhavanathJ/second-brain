@@ -208,4 +208,45 @@ async function revokeRefreshTokenByRaw(rawRefreshToken) {
   await authService.revokeRefreshToken(tokenHash);
 }
 
-module.exports = { signup, login, refresh, logout, changePassword, issueTokenPair, revokeRefreshTokenByRaw };
+async function updateUsername(req, res) {
+  const { username } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required.' });
+  }
+  if (!USERNAME_REGEX.test(username)) {
+    return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, and underscores only.' });
+  }
+
+  try {
+    const existing = await authService.findUserByUsername(username);
+    if (existing && existing.id !== req.userId) {
+      return res.status(409).json({ error: 'This username is already taken.' });
+    }
+
+    const normalizedUsername = username.toLowerCase();
+    await authService.updateUsername(req.userId, normalizedUsername);
+
+    // Issue fresh access/refresh token pair so the new username
+    // is encoded in the JWT immediately.
+    const tokens = await issueTokenPair({
+      userId: req.userId,
+      profileId: req.profileId,
+      username: normalizedUsername,
+    });
+
+    return res.status(200).json({
+      message: 'Username updated.',
+      username: normalizedUsername,
+      ...tokens,
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'This username is already taken.' });
+    }
+    console.error('Update username error:', err);
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+}
+
+module.exports = { signup, login, refresh, logout, changePassword, updateUsername, issueTokenPair, revokeRefreshTokenByRaw };

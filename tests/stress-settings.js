@@ -36,41 +36,34 @@ async function getAuthToken(userId, profileId, username) {
   const { user, profile } = await seedUserWithProfile('settings@example.com', 'settingsuser', 'password123', 'Main');
   const tokens = await getAuthToken(user.id, profile.id, user.username);
 
-  // ================= DESIGN_SYSTEM VALIDATION =================
-  section('design_system: rejects invalid values');
+  // ================= DESIGN_SYSTEM REMOVAL REGRESSION =================
+  // design_system was dropped entirely (dead column, Signal theme no
+  // longer exists). These checks guard against it silently coming back:
+  // an unknown field should be ignored, not error, and never appear on
+  // the settings object — and it must not interfere with real fields
+  // updated in the same request.
+  section('design_system: fully removed, no trace left behind');
 
-  // 1. Valid: "signal"
+  // 1. Sending it alone leaves zero real fields — correctly 400,
+  // same as any request with no valid fields (pre-existing behavior)
   {
     const r = await call(settingsController.updateSettings, { profileId: profile.id, body: { design_system: 'signal' } });
-    check(r.status === 200, 'design_system=signal → 200', `got ${r.status}`);
-    check(r.body.settings.design_system === 'signal', 'stored as signal');
+    check(r.status === 400, 'design_system alone → 400 (no valid fields left)', `got ${r.status}`);
   }
 
-  // 2. Valid: "neo"
+  // 2. A real field update alongside a dead design_system key still applies
   {
-    const r = await call(settingsController.updateSettings, { profileId: profile.id, body: { design_system: 'neo' } });
-    check(r.status === 200, 'design_system=neo → 200', `got ${r.status}`);
-    check(r.body.settings.design_system === 'neo', 'stored as neo');
+    const r = await call(settingsController.updateSettings, { profileId: profile.id, body: { design_system: 'neo', theme: 'dark' } });
+    check(r.status === 200, 'mixed with real field → 200', `got ${r.status}`);
+    check(r.body.settings.theme === 'dark', 'real field (theme) still applied');
+    check(r.body.settings.design_system === undefined, 'design_system still absent from response');
   }
 
-  // 3. Invalid: "modern"
+  // 3. GET /settings never returns the column at all
   {
-    const r = await call(settingsController.updateSettings, { profileId: profile.id, body: { design_system: 'modern' } });
-    check(r.status === 400, 'design_system=modern → 400', `got ${r.status}`);
-    check(r.body && r.body.error && r.body.error.includes('design_system'), 'error mentions design_system');
-  }
-
-  // 4. Invalid: empty string
-  {
-    const r = await call(settingsController.updateSettings, { profileId: profile.id, body: { design_system: '' } });
-    check(r.status === 400, 'design_system="" → 400', `got ${r.status}`);
-  }
-
-  // 5. Invalid: null (missing field)
-  // The controller only validates if field is present, so this should be ignored
-  {
-    const r = await call(settingsController.updateSettings, { profileId: profile.id, body: { design_system: null } });
-    check(r.status === 400, 'design_system=null → 400', `got ${r.status}`);
+    const r = await call(settingsController.getSettings, { profileId: profile.id });
+    check(r.status === 200, 'GET settings → 200', `got ${r.status}`);
+    check(r.body.settings.design_system === undefined, 'design_system absent from GET response');
   }
 
   // ================= LEGACY TIMEZONE NORMALIZATION =================

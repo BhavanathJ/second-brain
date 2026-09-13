@@ -14,8 +14,6 @@
                 ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
                 : pref;
             document.documentElement.setAttribute('data-theme', resolved);
-            var design = localStorage.getItem('design_system') || 'signal';
-            document.documentElement.setAttribute('data-design', design);
             // Update favicon href before first paint to match resolved theme
             var favicon = document.getElementById('favicon');
             if (favicon) favicon.href = resolved === 'dark' ? '../favicon-dark.svg' : '../favicon.svg';
@@ -26,11 +24,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="../css/app.css" rel="stylesheet" />
-    <link href="../css/neo.css" rel="stylesheet" />
 </head>
 
 <body>
     <div id="app-nav"></div>
+    <div id="profileFilterContainer"></div>
 
     <main class="calendar-page">
         <div class="cal-nav">
@@ -46,6 +44,14 @@
                 <button class="btn btn-outline-secondary view-btn" data-view="day">Day</button>
             </div>
             <button class="btn btn-primary btn-sm" id="addEventBtn">+ Add Event</button>
+        </div>
+
+        <!-- Legend for calendar dots -->
+        <div class="cal-legend mb-2" role="group" aria-label="Calendar item types">
+            <span class="cal-legend-item"><span class="cal-dot task"></span> Task</span>
+            <span class="cal-legend-item"><span class="cal-dot event"></span> Event</span>
+            <span class="cal-legend-item"><span class="cal-dot reminder"></span> Reminder</span>
+            <span class="cal-legend-item"><span class="cal-dot habit"></span> Habit</span>
         </div>
 
         <div class="cal-grid" id="calGrid"></div>

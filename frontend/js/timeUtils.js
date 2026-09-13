@@ -118,3 +118,48 @@ export function getLocalWeekBounds(timeZone, weekStartsOn, dateStr) {
     const end = new Date(getLocalMidnightUTC(timeZone, dayAfterWeekEnd).getTime() - 1);
     return { startISO: start.toISOString(), endISO: end.toISOString(), weekStartStr, weekEndStr };
 }
+
+// ------------------------------------------------------------------
+// Display formatting — was independently reimplemented (byte-identical
+// core logic) across calendar.js, reminders.js, dashboard.js, and
+// tasks.js. Centralized here since it's the same "format this instant
+// as a wall-clock string in timeZone, then append itemTimeZone if it
+// differs" concern the rest of this file already deals with.
+// ------------------------------------------------------------------
+
+export function formatTime(isoString, timeZone) {
+    if (!isoString) return '';
+    return new Date(isoString).toLocaleTimeString('en-US', { timeZone, hour: 'numeric', minute: '2-digit' });
+}
+
+export function formatDate(isoString, timeZone) {
+    if (!isoString) return '';
+    return new Date(isoString).toLocaleDateString('en-US', { timeZone, month: 'short', day: 'numeric' });
+}
+
+export function formatDateTime(isoString, timeZone) {
+    if (!isoString) return '';
+    return new Date(isoString).toLocaleString('en-US', {
+        timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+}
+
+// Appends " (itemTimeZone)" only when it differs from the viewer's own
+// timeZone — e.g. viewing a profile's item that was created in a
+// different timezone than the one currently active.
+function withTZSuffix(base, timeZone, itemTimeZone) {
+    if (!itemTimeZone || itemTimeZone === timeZone) return base;
+    return `${base} (${itemTimeZone})`;
+}
+
+export function formatTimeWithTZ(isoString, timeZone, itemTimeZone) {
+    return withTZSuffix(formatTime(isoString, timeZone), timeZone, itemTimeZone);
+}
+
+export function formatDateWithTZ(isoString, timeZone, itemTimeZone) {
+    return withTZSuffix(formatDate(isoString, timeZone), timeZone, itemTimeZone);
+}
+
+export function formatDateTimeWithTZ(isoString, timeZone, itemTimeZone) {
+    return withTZSuffix(formatDateTime(isoString, timeZone), timeZone, itemTimeZone);
+}

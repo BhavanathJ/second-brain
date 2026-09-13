@@ -2,12 +2,8 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
+import { initProfileFilter } from '../profileFilter.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 function parseTags(input) {
     return input.split(',').map(t => t.trim()).filter(Boolean);
@@ -21,6 +17,15 @@ function localInputToISO(value) {
 let editModal = null;
 let convertModal = null;
 let allNotes = [];
+let currentProfileFilter = null;
+let profilesCache = [];
+
+function renderProfileBadge(item) {
+    const profileIds = [...new Set(allNotes.map(n => n.profile_id).filter(Boolean))];
+    const showBadge = profileIds.length > 1 && item.profile_id;
+    if (!showBadge) return '';
+    return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
+}
 
 function renderNote(note) {
     const tagsHTML = note.tags.length
@@ -38,7 +43,7 @@ function renderNote(note) {
               data-target="content-${note.id}" aria-expanded="false">Show more</button>
       ${tagsHTML}
       <div class="note-footer">
-        ${convertedHTML}
+        ${convertedHTML}${renderProfileBadge(note)}
         <div class="note-actions">
           <button class="btn btn-outline-secondary note-edit-btn" data-id="${note.id}">Edit</button>
           <button class="btn btn-outline-danger note-delete-btn" data-id="${note.id}">Delete</button>
@@ -57,9 +62,37 @@ function render() {
 }
 
 async function loadNotes(tags = []) {
-    const query = tags.length ? `?tags=${encodeURIComponent(tags.join(','))}` : '';
-    const { notes } = await apiFetch(`/notes${query}`);
+    let url = '/notes';
+    const queryParts = [];
+
+    if (tags.length) {
+        queryParts.push(`tags=${encodeURIComponent(tags.join(','))}`);
+    }
+    if (currentProfileFilter === 'all') {
+        queryParts.push('profile_ids=all');
+    } else if (Array.isArray(currentProfileFilter) && currentProfileFilter.length > 0) {
+        queryParts.push(`profile_ids=${currentProfileFilter.join(',')}`);
+    }
+
+    if (queryParts.length > 0) {
+        url += '?' + queryParts.join('&');
+    }
+
+    const { notes } = await apiFetch(url);
     allNotes = notes;
+
+    // Cache profiles for badge rendering
+    const profileIds = [...new Set(notes.map(n => n.profile_id).filter(Boolean))];
+    if (profileIds.length > 0) {
+        try {
+            const { profiles } = await apiFetch('/profiles');
+            profilesCache = profiles;
+        } catch (err) {
+            console.error('Failed to load profiles for badges:', err);
+            profilesCache = [];
+        }
+    }
+
     render();
 }
 
@@ -220,6 +253,12 @@ function currentFilterTags() {
 async function main() {
     const layoutInfo = await initLayout('notes');
     if (!layoutInfo) return;
+
+    // Initialize profile filter
+    await initProfileFilter((profileIds) => {
+        currentProfileFilter = profileIds;
+        loadNotes(currentFilterTags());
+    });
 
     document.getElementById('captureForm').addEventListener('submit', handleCaptureSubmit);
     document.getElementById('editNoteForm').addEventListener('submit', handleEditSubmit);

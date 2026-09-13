@@ -14,8 +14,6 @@
                 ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
                 : pref;
             document.documentElement.setAttribute('data-theme', resolved);
-            var design = localStorage.getItem('design_system') || 'signal';
-            document.documentElement.setAttribute('data-design', design);
             // Update favicon href before first paint to match resolved theme
             var favicon = document.getElementById('favicon');
             if (favicon) favicon.href = resolved === 'dark' ? '../favicon-dark.svg' : '../favicon.svg';
@@ -26,7 +24,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="../css/app.css" rel="stylesheet" />
-    <link href="../css/neo.css" rel="stylesheet" />
 </head>
 
 <body>
@@ -41,13 +38,6 @@
                     <label class="form-label" for="timezoneSelect">Timezone</label>
                     <select class="form-select" id="timezoneSelect"></select>
                     <div class="form-text" id="timezoneOffsetDisplay"></div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label" for="designSystemSelect">Design System</label>
-                    <select class="form-select" id="designSystemSelect">
-                        <option value="signal">Signal</option>
-                        <option value="neo">Neobrutalism</option>
-                    </select>
                 </div>
                 <div class="mb-3">
                     <!-- <label class="form-label" for="themeSelect">Theme</label>
@@ -94,6 +84,13 @@
                                 <label class="form-label" for="renameProfileName">New Name</label>
                                 <input type="text" class="form-control" id="renameProfileName" required />
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="renameProfileColor">Color</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="color" class="form-control form-control-color" id="renameProfileColor" style="width: 60px; height: 38px;" />
+                                    <span id="renameProfileColorHex" class="form-text"></span>
+                                </div>
+                            </div>
                         </form>
                     </div>
                     <div class="modal-footer">
@@ -131,6 +128,26 @@
 
         <div class="settings-card">
             <div class="dash-section-title">Account</div>
+
+            <div class="mb-3">
+                <label class="form-label" for="emailDisplay">Email</label>
+                <input type="email" class="form-control form-control-sm" id="emailDisplay" readonly />
+                <div class="form-text">Your email cannot be changed.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <div id="usernameContainer" class="d-flex align-items-center gap-2">
+                    <span id="usernameDisplay" class="fw-semibold"></span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm p-1 d-inline-flex align-items-center" id="editUsernameBtn" title="Edit username" aria-label="Edit username">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708z"/></svg>
+                    </button>
+                </div>
+                <div id="usernameError" class="text-danger small mt-1" style="display: none;"></div>
+                <div class="form-text">Your username is public and appears in the navigation bar.</div>
+            </div>
+
+            <hr class="my-3" />
+
             <a href="change-password.html" class="btn btn-outline-danger btn-sm">Change Password</a>
         </div>
     </main>

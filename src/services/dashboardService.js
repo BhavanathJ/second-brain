@@ -35,6 +35,20 @@ async function getOverdueTasks(profileId, todayStartISO) {
     return data;
 }
 
+async function getTasksWithNoDeadline(profileId) {
+    const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('profile_id', profileId)
+        .is('deleted_at', null)
+        .is('due_at', null)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+}
+
 // Returns all active habits with today's completion status attached.
 // Two queries: fetch habits, fetch today's logs, merge in JS.
 async function getHabitsWithTodayStatus(profileId, timeZone) {
@@ -117,6 +131,7 @@ async function getDashboardData(profileId, timeZone) {
         next7Reminders,
         next7Events,
         overdueTasks,
+        noDeadlineTasks,
     ] = await Promise.all([
         getTasksForRange(profileId, today.start, today.end),
         getRemindersForRange(profileId, today.start, today.end),
@@ -129,6 +144,7 @@ async function getDashboardData(profileId, timeZone) {
         getRemindersForRange(profileId, next7.start, next7.end),
         getCalendarEventsForRange(profileId, next7.start, next7.end),
         getOverdueTasks(profileId, today.start),
+        getTasksWithNoDeadline(profileId),
     ]);
 
     return {
@@ -151,7 +167,10 @@ async function getDashboardData(profileId, timeZone) {
         overdue: {
             tasks: overdueTasks,
         },
+        no_deadline: {
+            tasks: noDeadlineTasks,
+        },
     };
 }
 
-module.exports = { getDashboardData };
+module.exports = { getDashboardData, getTasksWithNoDeadline };

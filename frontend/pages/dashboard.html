@@ -14,8 +14,6 @@
                 ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
                 : pref;
             document.documentElement.setAttribute('data-theme', resolved);
-            var design = localStorage.getItem('design_system') || 'signal';
-            document.documentElement.setAttribute('data-design', design);
             // Update favicon href before first paint to match resolved theme
             var favicon = document.getElementById('favicon');
             if (favicon) favicon.href = resolved === 'dark' ? '../favicon-dark.svg' : '../favicon.svg';
@@ -26,11 +24,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" />
     <link href="../css/app.css" rel="stylesheet" />
-    <link href="../css/neo.css" rel="stylesheet" />
 </head>
 
 <body>
     <div id="app-nav"></div>
+    <div id="profileFilterContainer"></div>
 
     <main class="dashboard-page">
         <div id="overdueSection"></div>
@@ -66,6 +64,11 @@
         <div class="dash-card">
             <div class="dash-section-title">Next 7 Days</div>
             <div id="next7Items"></div>
+        </div>
+
+        <div class="dash-card">
+            <div class="dash-section-title">No Deadline</div>
+            <div id="noDeadlineTasks"></div>
         </div>
     </main>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>

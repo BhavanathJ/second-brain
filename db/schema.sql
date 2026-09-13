@@ -29,6 +29,7 @@ CREATE TABLE profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#6B7280',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -57,7 +58,6 @@ CREATE TABLE settings (
   timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
   theme TEXT NOT NULL DEFAULT 'light',
   week_starts_on SMALLINT NOT NULL DEFAULT 0, -- 0=Sunday, 1=Monday (locked: Sunday)
-  design_system TEXT NOT NULL DEFAULT 'signal', -- 'signal' | 'neo'
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

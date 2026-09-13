@@ -49,6 +49,7 @@ erDiagram
     uuid id PK
     uuid user_id FK
     text name
+    text color
     timestamptz created_at
   }
   REFRESH_TOKENS {
@@ -65,7 +66,6 @@ erDiagram
     text timezone
     text theme
     smallint week_starts_on
-    text design_system
     timestamptz updated_at
   }
   TASKS {

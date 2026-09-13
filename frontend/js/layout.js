@@ -1,6 +1,6 @@
 import { apiFetch } from './api.js';
 import { showToast } from './toast.js';
-import { resolveTheme, watchSystemTheme } from './themeUtils.js';
+import { watchSystemTheme, applyTheme, watchExternalThemeChanges } from './themeUtils.js';
 import { escapeHtml } from './utils.js';
 
 const NAV_ITEMS = [
@@ -74,8 +74,14 @@ async function populateProfileSwitcher(currentProfileId) {
     try {
         const { profiles } = await apiFetch('/profiles');
         select.innerHTML = profiles
-            .map(p => `<option value="${p.id}"${p.id === currentProfileId ? ' selected' : ''}>${p.name}</option>`)
+            .map(p => `<option value="${p.id}"${p.id === currentProfileId ? ' selected' : ''} data-color="${p.color}">${p.name}</option>`)
             .join('');
+
+        // Apply color accent to the active profile via CSS variable
+        const activeOption = select.options[select.selectedIndex];
+        if (activeOption && activeOption.dataset.color) {
+            select.style.setProperty('--profile-color', activeOption.dataset.color);
+        }
     } catch (err) {
         console.error('Failed to load profiles:', err);
     }
@@ -97,16 +103,24 @@ async function populateProfileSwitcher(currentProfileId) {
             showToast('Failed to switch profile: ' + err.message);
         }
     });
+
+    // Update border color when selection changes (before reload)
+    select.addEventListener('change', () => {
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption && selectedOption.dataset.color) {
+            select.style.setProperty('--profile-color', selectedOption.dataset.color);
+        }
+    });
 }
 
-// Applies the RESOLVED theme ('light'/'dark') to the DOM, and caches
-// the RAW preference ('light'/'dark'/'system') in localStorage — the
-// cache is what every page's pre-paint <head> script reads before
-// this file even loads, to avoid a flash of the wrong theme.
+// Wraps the shared applyTheme (themeUtils.js) so this file's call sites
+// stay unchanged — the actual logic, including the favicon update, now
+// lives in one place shared with settings.js's own theme control. It
+// used to be reimplemented here without the favicon step, which is why
+// the icon looked "stuck" until a redirect or refresh even though the
+// rest of the theme changed instantly.
 function applyResolvedTheme(rawPref) {
-    const resolved = resolveTheme(rawPref);
-    document.documentElement.setAttribute('data-theme', resolved);
-    localStorage.setItem('theme', rawPref);
+    applyTheme(rawPref);
 }
 
 let stopWatchingSystemTheme = null;
@@ -132,6 +146,14 @@ async function initThemeSelect() {
     // OS event fires, so this doesn't fight an explicit Light/Dark choice.
     stopWatchingSystemTheme = watchSystemTheme(() => {
         if (currentPref === 'system') applyResolvedTheme('system');
+    });
+
+    // Cross-tab sync — if the theme was changed in another tab, follow it
+    // here too, including updating the select and the favicon.
+    watchExternalThemeChanges((newRawPref) => {
+        currentPref = newRawPref;
+        select.value = currentPref;
+        applyResolvedTheme(currentPref);
     });
 
     select.addEventListener('change', async () => {

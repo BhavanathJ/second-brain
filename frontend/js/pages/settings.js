@@ -1,21 +1,16 @@
 import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
-import { resolveTheme, updateFavicon } from '../themeUtils.js';
+import { applyTheme } from '../themeUtils.js';
 import { getOffsetMinutes } from '../timeUtils.js';
-import { getTimezoneDisplayLabel, normalizeTimezone } from '../timezoneNames.js';
+import { getTimezoneDisplayLabel, getFriendlyTimezoneName, normalizeTimezone } from '../timezoneNames.js';
+import { escapeHtml } from '../utils.js';
 
 let renameProfileModal = null;
 let deleteProfileModal = null;
 let profileToRenameId = null;
 let profileToDeleteId = null;
 let profileToDeleteName = null;
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
 
 function getOffsetMinutesValue(timezone) {
     return getOffsetMinutes(new Date(), timezone);
@@ -50,9 +45,10 @@ function populateTimezoneSelect(currentTimezone) {
     const zonesWithOffset = uniqueZones.map(z => {
         const offset = getOffsetMinutesValue(z);
         const offsetStr = formatOffsetString(offset);
+        // Use friendly name + IANA + offset for display
         const label = getTimezoneDisplayLabel(z, offsetStr);
-        return { zone: z, offset, label };
-    }).sort((a, b) => a.offset - b.offset || a.label.localeCompare(b.label));
+        return { zone: z, offset, label, friendly: getFriendlyTimezoneName(z) };
+    }).sort((a, b) => a.offset - b.offset || a.friendly.localeCompare(b.friendly));
 
     select.innerHTML = zonesWithOffset
         .map(({ zone, label }) => {
@@ -74,8 +70,23 @@ function getBrowserTimezone() {
     return null;
 }
 
+/**
+ * Check if the user's current timezone is the default (Asia/Kolkata),
+ * suggesting they haven't customized it yet.
+ * @param {string} timezone - Current saved timezone
+ * @returns {boolean} True if using default timezone
+ */
+function isDefaultTimezone(timezone) {
+    return normalizeTimezone(timezone) === 'Asia/Kolkata';
+}
+
 async function loadSettings() {
-    const { settings } = await apiFetch('/settings');
+    const { settings, user } = await apiFetch('/settings');
+
+    // Populate email (read-only) and username fields
+    document.getElementById('emailDisplay').value = user.email || '';
+    currentUsername = user.username || '';
+    renderUsernameDisplayMode();
 
     // Always use the saved timezone as the selected value
     const savedTimezone = normalizeTimezone(settings.timezone);
@@ -84,9 +95,9 @@ async function loadSettings() {
 
     // If saved timezone is the default, check for browser detection
     // and show a non-intrusive suggestion (user must explicitly accept)
-    if (savedTimezone === 'Asia/Kolkata') {
+    if (isDefaultTimezone(savedTimezone)) {
         const browserTZ = getBrowserTimezone();
-        if (browserTZ && browserTZ !== 'Asia/Kolkata') {
+        if (browserTZ && !isDefaultTimezone(browserTZ)) {
             showTimezoneSuggestion(browserTZ);
         }
     }
@@ -99,7 +110,6 @@ async function loadSettings() {
     const themeEl = document.getElementById('themeSelect');
     if (themeEl) themeEl.value = settings.theme;
     document.getElementById('weekStartSelect').value = String(settings.week_starts_on);
-    document.getElementById('designSystemSelect').value = settings.design_system || 'signal';
 }
 
 function showTimezoneSuggestion(detectedTimezone) {
@@ -141,14 +151,17 @@ async function loadProfiles(currentProfileId) {
     mount.innerHTML = profiles.map(p => `
     <div class="profile-list-item d-flex align-items-center justify-content-between">
       <div>
-        <span>${escapeHtml(p.name)}</span>
+        <span style="display:inline-flex;align-items:center;gap:0.4rem;">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};border:1px solid var(--sb-border);"></span>
+          ${escapeHtml(p.name)}
+        </span>
         ${p.id === currentProfileId ? '<span class="text-muted ms-2">Active</span>' : ''}
       </div>
       <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-secondary rename-profile-btn" data-profile-id="${p.id}" data-profile-name="${escapeHtml(p.name)}" data-profile-color="${p.color}" title="Rename">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708z"/></svg>
+        </button>
         ${p.id !== currentProfileId ? `
-          <button type="button" class="btn btn-outline-secondary rename-profile-btn" data-profile-id="${p.id}" data-profile-name="${escapeHtml(p.name)}" title="Rename">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708z"/></svg>
-          </button>
           <button type="button" class="btn btn-outline-danger delete-profile-btn" data-profile-id="${p.id}" data-profile-name="${escapeHtml(p.name)}" title="Delete">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
           </button>
@@ -172,7 +185,6 @@ async function handleSubmit(e) {
     const payload = {
         timezone: document.getElementById('timezoneSelect').value,
         week_starts_on: Number(document.getElementById('weekStartSelect').value),
-        design_system: document.getElementById('designSystemSelect').value,
     };
     if (themeEl) {
         payload.theme = themeEl.value;
@@ -181,17 +193,10 @@ async function handleSubmit(e) {
     try {
         await apiFetch('/settings', { method: 'PATCH', body: JSON.stringify(payload) });
 
-        // Resolve the raw pref (light/dark/system) to an actual display value
-        // before writing data-theme — CSS only matches "light"/"dark", so
-        // writing "system" raw would fall back to the default until reload.
-        // The RAW pref is still cached in localStorage for pre-paint theme reads.
-        const resolvedTheme = resolveTheme(payload.theme);
-        document.documentElement.setAttribute('data-theme', resolvedTheme);
-        localStorage.setItem('theme', payload.theme);
-        updateFavicon(resolvedTheme);
-        // Also persist and apply design system
-        document.documentElement.setAttribute('data-design', payload.design_system);
-        localStorage.setItem('design_system', payload.design_system);
+        // Resolve+apply happens in one shared place (themeUtils.js) so
+        // this can't drift from the navbar's own theme control again —
+        // that's exactly what caused the favicon-not-updating bug.
+        applyTheme(payload.theme);
 
         const msg = document.getElementById('saveMsg');
         msg.classList.add('visible');
@@ -223,6 +228,7 @@ function handleRenameClick(e) {
     const btn = e.currentTarget;
     profileToRenameId = btn.dataset.profileId;
     const currentName = btn.dataset.profileName;
+    const currentColor = btn.dataset.profileColor;
 
     if (!renameProfileModal) {
         renameProfileModal = new bootstrap.Modal(document.getElementById('renameProfileModal'));
@@ -230,6 +236,15 @@ function handleRenameClick(e) {
 
     document.getElementById('renameProfileId').value = profileToRenameId;
     document.getElementById('renameProfileName').value = currentName;
+    document.getElementById('renameProfileColor').value = currentColor;
+    document.getElementById('renameProfileColorHex').textContent = currentColor.toUpperCase();
+
+    // Update hex display when color picker changes
+    const colorInput = document.getElementById('renameProfileColor');
+    colorInput.onchange = () => {
+        document.getElementById('renameProfileColorHex').textContent = colorInput.value.toUpperCase();
+    };
+
     renameProfileModal.show();
 }
 
@@ -258,10 +273,12 @@ async function handleRenameConfirm() {
         return;
     }
 
+    const newColor = document.getElementById('renameProfileColor').value;
+
     try {
         await apiFetch(`/profiles/${profileToRenameId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ name: newName })
+            body: JSON.stringify({ name: newName, color: newColor })
         });
         renameProfileModal.hide();
         window.location.reload();
@@ -288,6 +305,97 @@ async function handleDeleteConfirm() {
         window.location.reload();
     } catch (err) {
         showToast('Failed to delete profile: ' + err.message);
+    }
+}
+
+let currentUsername = '';
+
+function renderUsernameDisplayMode() {
+    const container = document.getElementById('usernameContainer');
+    if (!container) return;
+    const errorEl = document.getElementById('usernameError');
+    if (errorEl) errorEl.style.display = 'none';
+
+    container.innerHTML = `
+        <span id="usernameDisplay" class="fw-semibold">${escapeHtml(currentUsername)}</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm p-1 d-inline-flex align-items-center" id="editUsernameBtn" title="Edit username" aria-label="Edit username">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708z"/></svg>
+        </button>
+    `;
+
+    document.getElementById('editUsernameBtn').addEventListener('click', renderUsernameEditMode);
+}
+
+function renderUsernameEditMode() {
+    const container = document.getElementById('usernameContainer');
+    if (!container) return;
+    container.innerHTML = `
+        <input type="text" class="form-control form-control-sm" id="inlineUsernameInput" value="${escapeHtml(currentUsername)}" style="max-width: 220px;" autocomplete="off" />
+        <button type="button" class="btn btn-sm btn-outline-success p-1 d-inline-flex align-items-center" id="confirmUsernameBtn" title="Save username" aria-label="Save" style="color: var(--sb-ok); border-color: var(--sb-ok);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary p-1 d-inline-flex align-items-center" id="cancelUsernameBtn" title="Cancel" aria-label="Cancel" style="color: var(--sb-muted); border-color: var(--sb-border);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
+    `;
+
+    const input = document.getElementById('inlineUsernameInput');
+    input.focus();
+    input.select();
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleConfirmUsername();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            renderUsernameDisplayMode();
+        }
+    });
+
+    document.getElementById('confirmUsernameBtn').addEventListener('click', handleConfirmUsername);
+    document.getElementById('cancelUsernameBtn').addEventListener('click', () => {
+        renderUsernameDisplayMode();
+    });
+}
+
+async function handleConfirmUsername() {
+    const input = document.getElementById('inlineUsernameInput');
+    if (!input) return;
+    const newUsername = input.value.trim();
+    const errorEl = document.getElementById('usernameError');
+
+    const confirmBtn = document.getElementById('confirmUsernameBtn');
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    try {
+        const res = await apiFetch('/auth/username', {
+            method: 'PATCH',
+            body: JSON.stringify({ username: newUsername }),
+        });
+
+        if (res.accessToken && res.refreshToken) {
+            localStorage.setItem('accessToken', res.accessToken);
+            localStorage.setItem('refreshToken', res.refreshToken);
+        }
+
+        const navUsername = document.querySelector('.nav-username');
+        if (navUsername) {
+            navUsername.textContent = `Hi, ${res.username}`;
+        }
+
+        currentUsername = res.username;
+        if (errorEl) errorEl.style.display = 'none';
+        renderUsernameDisplayMode();
+        showToast('Username updated.', 'success');
+    } catch (err) {
+        if (errorEl) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+        }
+        showToast(err.message);
+        if (confirmBtn) confirmBtn.disabled = false;
+        input.focus();
     }
 }
 

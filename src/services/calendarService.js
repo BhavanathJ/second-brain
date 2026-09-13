@@ -60,8 +60,6 @@ async function getCalendarData(profileId, startDate, endDate) {
     return { tasks, habitLogs, calendarEvents, reminders };
 }
 
-// Multi-profile version: fetches calendar data across multiple profiles.
-// Returns concatenated arrays, each item retains its profile_id column.
 async function getCalendarDataForProfiles(profileIds, startDate, endDate) {
     const [tasks, habitLogs, calendarEvents, reminders] = await Promise.all([
         supabase
@@ -91,7 +89,6 @@ async function getCalendarDataForProfiles(profileIds, startDate, endDate) {
             .order('remind_at', { ascending: true }),
     ]);
 
-    // Check for errors
     if (tasks.error) throw tasks.error;
     if (habitLogs.error) throw habitLogs.error;
     if (calendarEvents.error) throw calendarEvents.error;

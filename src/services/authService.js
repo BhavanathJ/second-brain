@@ -132,6 +132,15 @@ async function revokeAllRefreshTokensForUser(userId) {
     if (error) throw error;
 }
 
+async function updateUsername(userId, newUsername) {
+    const { error } = await supabase
+        .from('users')
+        .update({ username: newUsername.toLowerCase() })
+        .eq('id', userId);
+
+    if (error) throw error;
+}
+
 module.exports = {
     findUserByEmail,
     findUserByUsername,
@@ -145,4 +154,5 @@ module.exports = {
     findActiveRefreshToken,
     revokeAllRefreshTokensForUser,
     revokeRefreshToken,
+    updateUsername,
 };

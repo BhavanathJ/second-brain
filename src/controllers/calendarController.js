@@ -17,8 +17,6 @@ async function getCalendarData(req, res) {
         });
     }
 
-    // Prevent absurdly large date ranges that would return the entire
-    // database — cap at 90 days (covers a 3-month calendar view max).
     const startDate = new Date(start);
     const endDate = new Date(end);
 
@@ -35,13 +33,11 @@ async function getCalendarData(req, res) {
     }
 
     try {
-        // Single-profile case (backward compatible): use existing function
         if (profileIds.length === 1 && profileIds[0] === req.profileId) {
             const data = await calendarService.getCalendarData(req.profileId, start, end);
             return res.status(200).json(data);
         }
 
-        // Multi-profile case: use new function
         const data = await calendarService.getCalendarDataForProfiles(profileIds, start, end);
         return res.status(200).json(data);
     } catch (err) {

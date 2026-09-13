@@ -2,28 +2,16 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
-function formatDateTime(isoString, timeZone) {
-    if (!isoString) return '';
-    return new Date(isoString).toLocaleString('en-US', {
-        timeZone,
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-}
+import { initProfileFilter } from '../profileFilter.js';
+import { formatDateTimeWithTZ } from '../timeUtils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 let timeZone = 'UTC';
 let allTasks = [];
 let modal = null;
 let viewModal = null;
+let currentProfileFilter = null; // null, 'all', or array of profile IDs
+let profilesCache = [];
 
 function bucketTasks(tasks) {
     return {
@@ -35,12 +23,18 @@ function bucketTasks(tasks) {
 }
 
 function renderTaskItem(task) {
+    const profileIds = [...new Set(allTasks.map(t => t.profile_id))];
+    const showProfileBadge = profileIds.length > 1 && task.profile_id;
+    const profileBadge = showProfileBadge
+        ? renderBadgeMarkup(profilesCache.find(p => p.id === task.profile_id))
+        : '';
+
     return `
     <div class="task-item${task.status === 'done' ? ' task-done' : ''}">
       <input type="checkbox" class="form-check-input task-done-checkbox" data-id="${task.id}" ${task.status === 'done' ? 'checked' : ''} />
       <div class="task-item-body">
-        <div class="task-item-title">${escapeHtml(task.title)}</div>
-        ${task.due_at ? `<div class="task-item-time">${formatDateTime(task.due_at, timeZone)}</div>` : ''}
+        <div class="task-item-title">${escapeHtml(task.title)} ${profileBadge}</div>
+        ${task.due_at ? `<div class="task-item-time">${formatDateTimeWithTZ(task.due_at, timeZone, task.profile_timezone)}</div>` : ''}
       </div>
       <div class="task-item-actions">
         <button class="btn btn-outline-secondary task-view-btn" data-id="${task.id}">View</button>
@@ -51,11 +45,18 @@ function renderTaskItem(task) {
   `;
 }
 
+// Stable sort: done tasks last, preserving relative order otherwise —
+// same pattern already used on the dashboard (dashboard.js sortByDone).
+function sortByDone(tasks) {
+    return [...tasks].sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
+}
+
 function renderQuadrant(mountId, tasks) {
     const mount = document.getElementById(mountId);
-    mount.innerHTML = tasks.length === 0
+    const sorted = sortByDone(tasks);
+    mount.innerHTML = sorted.length === 0
         ? '<div class="dash-empty">Nothing here.</div>'
-        : tasks.map(renderTaskItem).join('');
+        : sorted.map(renderTaskItem).join('');
 }
 
 function render() {
@@ -68,8 +69,29 @@ function render() {
 }
 
 async function loadTasks() {
-    const { tasks } = await apiFetch('/tasks');
+    let url = '/tasks';
+    if (currentProfileFilter === 'all') {
+        url += '?profile_ids=all';
+    } else if (Array.isArray(currentProfileFilter) && currentProfileFilter.length > 0) {
+        url += `?profile_ids=${currentProfileFilter.join(',')}`;
+    }
+    // null -> no param (backward compatible)
+
+    const { tasks } = await apiFetch(url);
     allTasks = tasks;
+
+    // Cache profiles for badge rendering
+    const profileIds = [...new Set(tasks.map(t => t.profile_id).filter(Boolean))];
+    if (profileIds.length > 0) {
+        try {
+            const { profiles } = await apiFetch('/profiles');
+            profilesCache = profiles;
+        } catch (err) {
+            console.error('Failed to load profiles for badges:', err);
+            profilesCache = [];
+        }
+    }
+
     render();
 }
 
@@ -161,7 +183,7 @@ function openViewModal(taskId) {
 
     document.getElementById('viewTaskTitle').textContent = task.title;
     document.getElementById('viewTaskDescription').textContent = task.description ?? '—';
-    document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTime(task.due_at, timeZone) : '—';
+    document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTimeWithTZ(task.due_at, timeZone, task.profile_timezone) : '—';
     document.getElementById('viewTaskStatus').textContent = task.status === 'done' ? 'Done' : 'Pending';
     document.getElementById('viewTaskUrgent').checked = task.urgent;
     document.getElementById('viewTaskImportant').checked = task.important;
@@ -212,6 +234,12 @@ async function main() {
     } catch (err) {
         console.error('Failed to load settings, defaulting task times to UTC:', err);
     }
+
+    // Initialize profile filter
+    await initProfileFilter((profileIds) => {
+        currentProfileFilter = profileIds;
+        loadTasks();
+    });
 
     document.getElementById('addTaskBtn').addEventListener('click', () => openModal(null));
     document.getElementById('taskForm').addEventListener('submit', handleSubmit);

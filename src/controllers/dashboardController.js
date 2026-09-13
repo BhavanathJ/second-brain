@@ -11,15 +11,12 @@ async function getDashboard(req, res) {
     }
 
     try {
-        // Single-profile case (backward compatible): use existing function
         if (profileIds.length === 1 && profileIds[0] === req.profileId) {
             const settings = await settingsService.getSettings(req.profileId);
             const data = await dashboardService.getDashboardData(req.profileId, settings.timezone);
             return res.status(200).json(data);
         }
 
-        // Multi-profile case: fetch each profile's dashboard data using its own timezone,
-        // then merge by concatenating arrays (each item retains its profile_id).
         const profileData = await Promise.all(
             profileIds.map(async (pid) => {
                 const settings = await settingsService.getSettings(pid);
@@ -28,27 +25,12 @@ async function getDashboard(req, res) {
             })
         );
 
-        // Merge results: concatenate arrays for each category
         const merged = {
-            today: {
-                tasks: [],
-                habits: [],
-                reminders: [],
-                calendar_events: [],
-            },
-            tomorrow: {
-                tasks: [],
-                reminders: [],
-                calendar_events: [],
-            },
-            next_7_days: {
-                tasks: [],
-                reminders: [],
-                calendar_events: [],
-            },
-            overdue: {
-                tasks: [],
-            },
+            today: { tasks: [], habits: [], reminders: [], calendar_events: [] },
+            tomorrow: { tasks: [], reminders: [], calendar_events: [] },
+            next_7_days: { tasks: [], reminders: [], calendar_events: [] },
+            overdue: { tasks: [] },
+            no_deadline: { tasks: [] },
         };
 
         for (const { data } of profileData) {
@@ -66,6 +48,7 @@ async function getDashboard(req, res) {
             merged.next_7_days.calendar_events.push(...data.next_7_days.calendar_events);
 
             merged.overdue.tasks.push(...data.overdue.tasks);
+            merged.no_deadline.tasks.push(...data.no_deadline.tasks);
         }
 
         return res.status(200).json(merged);

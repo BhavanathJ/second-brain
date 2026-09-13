@@ -93,7 +93,7 @@ async function getAuthToken(userId, profileId, username) {
 
   // 6. Restore the reminder
   {
-    const r = await call(binController.restoreEntry, { profileId: profile.id, params: { id: binReminder.id } });
+    const r = await call(binController.restoreEntry, { userId: user.id, profileId: profile.id, params: { id: binReminder.id } });
     check(r.status === 200, 'restore fired reminder → 200', `got ${r.status}`);
   }
 
@@ -115,7 +115,7 @@ async function getAuthToken(userId, profileId, username) {
 
   // 9. Try to restore the now-actually-purged entry
   {
-    const r = await call(binController.restoreEntry, { profileId: profile.id, params: { id: purgedBin.id } });
+    const r = await call(binController.restoreEntry, { userId: user.id, profileId: profile.id, params: { id: purgedBin.id } });
     check(r.status === 404, 'restore purged entry → 404', `got ${r.status}`);
     check(r.body && r.body.error && r.body.error.includes('not found'), 'error says not found');
   }
@@ -131,7 +131,7 @@ async function getAuthToken(userId, profileId, username) {
 
   // 11. Hard-delete the habit (this is the bin permanent delete for habit)
   {
-    const r = await call(binController.permanentDelete, { profileId: profile.id, params: { id: binHabit.id } });
+    const r = await call(binController.permanentDelete, { userId: user.id, profileId: profile.id, params: { id: binHabit.id } });
     check(r.status === 204, 'hard delete habit → 204', `got ${r.status}`);
   }
 
@@ -159,6 +159,56 @@ async function getAuthToken(userId, profileId, username) {
   // The fix ensures that if logs deletion fails, the habit is NOT deleted
   // (we can't easily test the failure case in the mock, but we document it)
   console.log(`  [gap] hardDeleteHabit error rollback not testable in mock (requires transaction or error injection)`);
+
+  // ================= CROSS-PROFILE RESTORE/DELETE =================
+  // Regression test for the bug fixed alongside this: restoreEntry and
+  // permanentDelete used to scope by req.profileId (the ACTIVE profile
+  // from the JWT) instead of the bin entry's actual owning profile.
+  // Since listBin can show entries from ANY profile the user owns (via
+  // the cross-profile filter), that meant restoring/deleting anything
+  // not in your currently-active profile silently 404'd, even though
+  // it was legitimately yours. Fix: fetch the bin entry by ID alone,
+  // verify ownership of ITS profile_id — same pattern as every other
+  // resource controller — then operate using entry.profile_id.
+  section('Cross-profile restore/delete: works for a non-active but owned profile');
+
+  const secondProfile = mock.seed('profiles', { user_id: user.id, name: 'Second' });
+  await settingsService.createDefaultSettings(secondProfile.id, TZ);
+
+  // 14. A task that lives in the SECOND profile, not the active one
+  const otherProfileTask = mock.seed('tasks', { profile_id: secondProfile.id, title: 'Task in second profile', status: 'pending', deleted_at: '2026-08-01T00:00:00Z' });
+  const otherProfileBinEntry = mock.seed('bin_entries', { profile_id: secondProfile.id, entity_type: 'task', entity_id: otherProfileTask.id });
+
+  // 15. Restore it while req.profileId is still the FIRST (active) profile —
+  // this is exactly what happens when the bin page's cross-profile filter
+  // is set to "All profiles" and you restore something from a profile
+  // you're not currently switched to.
+  {
+    const r = await call(binController.restoreEntry, { userId: user.id, profileId: profile.id, params: { id: otherProfileBinEntry.id } });
+    check(r.status === 200, 'restore entry from non-active-but-owned profile → 200', `got ${r.status}`);
+  }
+  const restoredOtherTask = mock._db.tasks.find(t => t.id === otherProfileTask.id);
+  check(restoredOtherTask && restoredOtherTask.deleted_at === null, 'task in second profile actually restored');
+
+  // 16. Same check for permanentDelete
+  const otherProfileTask2 = mock.seed('tasks', { profile_id: secondProfile.id, title: 'Task 2 in second profile', status: 'pending', deleted_at: '2026-08-01T00:00:00Z' });
+  const otherProfileBinEntry2 = mock.seed('bin_entries', { profile_id: secondProfile.id, entity_type: 'task', entity_id: otherProfileTask2.id });
+  {
+    const r = await call(binController.permanentDelete, { userId: user.id, profileId: profile.id, params: { id: otherProfileBinEntry2.id } });
+    check(r.status === 204, 'permanently delete entry from non-active-but-owned profile → 204', `got ${r.status}`);
+  }
+  check(!mock._db.tasks.find(t => t.id === otherProfileTask2.id), 'task in second profile actually hard-deleted');
+
+  // 17. Sanity check the OTHER direction still correctly blocks: a
+  // profile that isn't the caller's at all (belongs to a different user)
+  const strangerUser = mock.seed('users', { email: 'stranger@example.com', username: 'strangerbin', password_hash: 'x' });
+  const strangerProfile = mock.seed('profiles', { user_id: strangerUser.id, name: 'Stranger' });
+  const strangerTask = mock.seed('tasks', { profile_id: strangerProfile.id, title: 'Not yours', status: 'pending', deleted_at: '2026-08-01T00:00:00Z' });
+  const strangerBinEntry = mock.seed('bin_entries', { profile_id: strangerProfile.id, entity_type: 'task', entity_id: strangerTask.id });
+  {
+    const r = await call(binController.restoreEntry, { userId: user.id, profileId: profile.id, params: { id: strangerBinEntry.id } });
+    check(r.status === 404, 'restoring another user\'s bin entry → 404 (not 403 — no existence leak)', `got ${r.status}`);
+  }
 
   summary();
 })();

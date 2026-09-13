@@ -2,22 +2,9 @@ import { initLayout } from '../layout.js';
 import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
-function getLocalDateString(timeZone, date = new Date()) {
-    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-}
-
-function addDays(dateStr, days) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const dt = new Date(Date.UTC(y, m - 1, d + days));
-    return dt.toISOString().split('T')[0];
-}
+import { initProfileFilter } from '../profileFilter.js';
+import { getLocalDateString, addDays, getLocalWeekStartDateString } from '../timeUtils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 
 function dayLabel(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -25,26 +12,62 @@ function dayLabel(dateStr) {
 }
 
 let timeZone = 'UTC';
+let weekStartsOn = 0;
 let habits = [];
-let last7Days = [];
+let weekDays = [];
 const modalEl = document.getElementById('habitModal');
 const modal = new bootstrap.Modal(modalEl);
+let currentProfileFilter = null;
+let profilesCache = [];
+
+// Only this page's own "should a badge show at all" rule stays local —
+// multiple profiles' habits must actually be in view. The markup itself
+// comes from the shared renderer in utils.js.
+function renderProfileBadge(item) {
+    const profileIds = [...new Set(habits.map(h => h.profile_id).filter(Boolean))];
+    const showBadge = profileIds.length > 1 && item.profile_id;
+    if (!showBadge) return '';
+    return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
+}
+
 
 async function loadHabits() {
-    const { habits: fetchedHabits } = await apiFetch('/habits');
+    let url = '/habits';
+    if (currentProfileFilter === 'all') {
+        url += '?profile_ids=all';
+    } else if (Array.isArray(currentProfileFilter) && currentProfileFilter.length > 0) {
+        url += `?profile_ids=${currentProfileFilter.join(',')}`;
+    }
+
+    const { habits: fetchedHabits } = await apiFetch(url);
     habits = fetchedHabits;
 
     const todayStr = getLocalDateString(timeZone);
-    last7Days = Array.from({ length: 7 }, (_, i) => addDays(todayStr, i - 6));
+    // Calendar-aligned week (honors week_starts_on), not a rolling
+    // trailing-7-days window — same helper calendar.js already uses.
+    const weekStartStr = getLocalWeekStartDateString(timeZone, weekStartsOn, todayStr);
+    weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStartStr, i));
 
     const logsPerHabit = await Promise.all(
-        habits.map(h => apiFetch(`/habits/${h.id}/logs?start=${last7Days[0]}&end=${last7Days[6]}`))
+        habits.map(h => apiFetch(`/habits/${h.id}/logs?start=${weekDays[0]}&end=${weekDays[6]}`))
     );
 
     habits = habits.map((h, i) => ({
         ...h,
         loggedDates: new Set(logsPerHabit[i].logs.filter(l => l.completed).map(l => l.log_date)),
     }));
+
+    // Cache profiles for badge rendering
+    const profileIds = [...new Set(habits.map(h => h.profile_id).filter(Boolean))];
+    if (profileIds.length > 0) {
+        try {
+            const { profiles } = await apiFetch('/profiles');
+            profilesCache = profiles;
+        } catch (err) {
+            console.error('Failed to load profiles for badges:', err);
+            profilesCache = [];
+        }
+    }
 
     render();
 }
@@ -53,7 +76,7 @@ function renderDayGrid(habit) {
     const todayStr = getLocalDateString(timeZone);
     return `
     <div class="habit-week-grid">
-      ${last7Days.map(dateStr => {
+      ${weekDays.map(dateStr => {
         const isDone = habit.loggedDates.has(dateStr);
         const isToday = dateStr === todayStr;
         return `<div class="habit-day-cell${isDone ? ' done' : ''}${isToday ? ' today' : ''}"
@@ -69,7 +92,7 @@ function renderHabitCard(habit) {
     <div class="habit-card">
       <div class="habit-card-header">
         <div>
-          <div class="habit-title">${escapeHtml(habit.title)}</div>
+          <div class="habit-title">${escapeHtml(habit.title)}${renderProfileBadge(habit)}</div>
           <div class="habit-progress-label">${habit.this_week_count} / ${habit.target_per_week} this week</div>
         </div>
         <div class="habit-streak">🔥 ${habit.streak} wk streak</div>
@@ -181,9 +204,16 @@ async function main() {
     try {
         const { settings } = await apiFetch('/settings');
         timeZone = settings.timezone;
+        weekStartsOn = settings.week_starts_on;
     } catch (err) {
-        console.error('Failed to load settings, defaulting habit dates to UTC:', err);
+        console.error('Failed to load settings, defaulting habit dates to UTC/Sunday-start:', err);
     }
+
+    // Initialize profile filter
+    await initProfileFilter((profileIds) => {
+        currentProfileFilter = profileIds;
+        loadHabits();
+    });
 
     document.getElementById('addHabitBtn').addEventListener('click', () => openModal(null));
     document.getElementById('habitForm').addEventListener('submit', handleSubmit);

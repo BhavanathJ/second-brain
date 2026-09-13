@@ -4,6 +4,7 @@ const noteService = require('../services/noteService');
 const reminderService = require('../services/reminderService');
 const habitService = require('../services/habitService');
 const calendarEventService = require('../services/calendarEventService');
+const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
 
 // Option B restore map — add one line here whenever a new feature is built.
 const entityHandlers = {
@@ -31,8 +32,16 @@ const entityHandlers = {
 };
 
 async function listBin(req, res) {
+    let profileIds;
     try {
-        const entries = await binService.listBinEntries(req.profileId);
+        profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ error: err.message });
+    }
+    try {
+        const entries = profileIds.length === 1 && profileIds[0] === req.profileId
+            ? await binService.listBinEntries(req.profileId)
+            : await binService.listBinEntriesForProfiles(profileIds);
         return res.status(200).json({ entries });
     } catch (err) {
         console.error('List bin error:', err);
@@ -42,8 +51,17 @@ async function listBin(req, res) {
 
 async function restoreEntry(req, res) {
     try {
-        const entry = await binService.getBinEntryById(req.profileId, req.params.id);
+        // Fetch by ID ALONE (not scoped to req.profileId — the active
+        // profile) — this must work for any profile the caller owns,
+        // since listBin can show entries across ALL owned profiles via
+        // the cross-profile filter. Same fetch-then-verify pattern used
+        // everywhere else in this app.
+        const entry = await binService.getBinEntryByIdOnly(req.params.id);
         if (!entry) {
+            return res.status(404).json({ error: 'Bin entry not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, entry.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Bin entry not found.' });
         }
 
@@ -56,12 +74,12 @@ async function restoreEntry(req, res) {
         // (hard-deleted elsewhere). Don't remove the bin entry in that
         // case — that would silently "lose" the item with a 200 response
         // even though nothing was actually restored.
-        const restored = await handler.restore(req.profileId, entry.entity_id);
+        const restored = await handler.restore(entry.profile_id, entry.entity_id);
         if (!restored) {
             return res.status(404).json({ error: 'The original item no longer exists and cannot be restored.' });
         }
 
-        await binService.removeBinEntry(req.profileId, entry.id);
+        await binService.removeBinEntry(entry.profile_id, entry.id);
 
         return res.status(200).json({ message: 'Restored successfully.', entityType: entry.entity_type });
     } catch (err) {
@@ -72,8 +90,12 @@ async function restoreEntry(req, res) {
 
 async function permanentDelete(req, res) {
     try {
-        const entry = await binService.getBinEntryById(req.profileId, req.params.id);
+        const entry = await binService.getBinEntryByIdOnly(req.params.id);
         if (!entry) {
+            return res.status(404).json({ error: 'Bin entry not found.' });
+        }
+        const owns = await verifyProfileOwnership(req.userId, entry.profile_id);
+        if (!owns) {
             return res.status(404).json({ error: 'Bin entry not found.' });
         }
 
@@ -82,13 +104,13 @@ async function permanentDelete(req, res) {
             return res.status(400).json({ error: `Cannot delete entity_type: ${entry.entity_type}` });
         }
 
-        await handler.hardDelete(req.profileId, entry.entity_id);
-        await binService.removeBinEntry(req.profileId, entry.id);
+        await handler.hardDelete(entry.profile_id, entry.entity_id);
+        await binService.removeBinEntry(entry.profile_id, entry.id);
 
         // If a task that was converted from a note is permanently deleted,
         // clear the converted_task_id on the note so it can be converted again
         if (entry.entity_type === 'task') {
-            await noteService.clearConvertedTaskId(req.profileId, entry.entity_id);
+            await noteService.clearConvertedTaskId(entry.profile_id, entry.entity_id);
         }
 
         return res.status(204).send();

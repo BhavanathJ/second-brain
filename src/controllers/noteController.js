@@ -60,7 +60,7 @@ async function createNote(req, res) {
     }
 
     try {
-        const note = await noteService.createNote(req.profileId, {
+        const note = await noteService.createNote(targetProfileId, {
             content: content.trim(),
             tags: Array.isArray(tags) ? tags : [],
         });

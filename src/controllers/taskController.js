@@ -76,7 +76,7 @@ async function createTask(req, res) {
     }
 
     try {
-        const task = await taskService.createTask(req.profileId, {
+        const task = await taskService.createTask(targetProfileId, {
             title: title.trim(),
             description,
             urgent,

@@ -78,7 +78,7 @@ async function createReminder(req, res) {
     }
 
     try {
-        const reminder = await reminderService.createReminder(req.profileId, {
+        const reminder = await reminderService.createReminder(targetProfileId, {
             title: title.trim(),
             remind_at,
             entity_type,

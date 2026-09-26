@@ -60,7 +60,7 @@ async function createCalendarEvent(req, res) {
     }
 
     try {
-        const event = await calendarEventService.createCalendarEvent(req.profileId, {
+        const event = await calendarEventService.createCalendarEvent(targetProfileId, {
             title: title.trim(),
             starts_at,
             ends_at,

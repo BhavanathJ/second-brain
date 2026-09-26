@@ -107,7 +107,7 @@ async function createHabit(req, res) {
     }
 
     try {
-        const habit = await habitService.createHabit(req.profileId, {
+        const habit = await habitService.createHabit(targetProfileId, {
             title: title.trim(),
             target_per_week,
         });

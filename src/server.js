@@ -1,5 +1,5 @@
 const express = require('express');
-
+const path = require('path');
 const cors = require('cors');
 const cron = require('node-cron');
 const config = require('./config/env');
@@ -19,10 +19,6 @@ const { purgeExpiredEntries } = require('./controllers/binController');
 
 const app = express();
 
-// Required for express-rate-limit to see the REAL client IP once this
-// is deployed behind Render's reverse proxy — without this, every user
-// would be silently lumped into one shared rate-limit bucket (the
-// proxy's IP), rate-limiting each other instead of themselves.
 app.set('trust proxy', 1);
 
 const allowedOrigins = Array.isArray(config.corsOrigin)
@@ -31,23 +27,17 @@ const allowedOrigins = Array.isArray(config.corsOrigin)
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, file://, server-to-server)
     if (!origin) {
       return callback(null, true);
     }
-
-    // In development, allow any localhost or 127.0.0.1 origin
     if (config.nodeEnv === 'development') {
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         return callback(null, true);
       }
     }
-
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-
-    // Cleanly deny CORS without throwing unhandled server errors
     return callback(null, false);
   },
   credentials: true
@@ -71,6 +61,14 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// Static frontend + 404 fallback — must come AFTER every API route above,
+// so Express only reaches these when nothing else matched.
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, '..', 'frontend', '404.html'));
+});
 
 cron.schedule('* * * * *', async () => {
   try {

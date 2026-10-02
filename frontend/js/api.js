@@ -1,5 +1,5 @@
 // frontend/js/api.js
-const API_BASE_URL = 'https://REPLACE-WITH-REAL-RENDER-BACKEND-URL.onrender.com/api';
+const API_BASE_URL = 'https://second-brain-1-glct.onrender.com/api';
 
 let refreshPromise = null; // shared in-flight refresh, prevents parallel-401 race
 

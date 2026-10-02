@@ -1,5 +1,6 @@
 // frontend/js/api.js
-const API_BASE_URL = '/api';
+const isDevServer = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '4000';
+const API_BASE_URL = isDevServer ? 'http://localhost:4000/api' : '/api';
 
 let refreshPromise = null; // shared in-flight refresh, prevents parallel-401 race
 

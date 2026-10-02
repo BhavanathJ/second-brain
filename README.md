@@ -1,8 +1,10 @@
 # Second Brain
 
+**Live:** [second-brain-1-glct.onrender.com](https://second-brain-1-glct.onrender.com)
+
 A full-featured personal productivity system: capture notes, organize tasks on an interactive Eisenhower matrix, build weekly habits with streak analytics, view a unified timezone-aware calendar, schedule automated reminders, and recycle deleted items via a 30-day auto-purging bin — all behind a Netflix-style multi-profile account system with cross-profile filtering.
 
-The **backend** is an Express 4 REST API on Node.js with direct **Supabase (PostgreSQL)** queries, JWT session management, background cron jobs, and rate limiting. The **frontend** is a dependency-free vanilla JavaScript (ES Modules) static app with Bootstrap 5 and a custom Neobrutalist design system.
+The **backend** is an Express 4 REST API on Node.js with direct **Supabase (PostgreSQL)** queries, JWT session management, background cron jobs, and rate limiting. The **frontend** is a dependency-free vanilla JavaScript (ES Modules) static app with Bootstrap 5 and a custom Neobrutalist design system — served by the same Express process as a single deployed unit.
 
 ---
 
@@ -27,12 +29,12 @@ The **backend** is an Express 4 REST API on Node.js with direct **Supabase (Post
 ## Tech Stack
 
 - **Backend Runtime:** Node.js (CommonJS)
-- **API Framework:** Express 4.x
-- **Database:** PostgreSQL via Supabase (`@supabase/supabase-js`, schema in [`db/schema.sql`](db/schema.sql)), accessed with the **service-role key** (see [Security](#security) — this means Postgres Row Level Security is not in play; all authorization is enforced in application code)
+- **API Framework:** Express 4.x — also serves the static frontend directly (`express.static`), so the whole app is one deployable unit, one process, one URL
+- **Database:** PostgreSQL via Supabase (`@supabase/supabase-js`, schema in [`db/schema.sql`](db/schema.sql)), accessed with the **service-role key** (see [Security](#security) — this means Postgres Row Level Security is not the authorization layer; all ownership checks are enforced in application code)
 - **Auth:** `jsonwebtoken` (HS256 access tokens), `bcryptjs` (password hashing, 10 rounds), SHA-256-hashed refresh tokens with rotation
 - **Rate Limiting:** `express-rate-limit`
-- **Job Scheduling:** `node-cron` (every-minute reminder dispatch, daily bin purge)
-- **Frontend:** Vanilla JavaScript (ES modules), Bootstrap 5, custom CSS — no build step, no framework
+- **Job Scheduling:** `node-cron` (every-minute reminder dispatch, daily bin purge) — runs in-process, which is why the deployment host must not spin the service down (see Deployment)
+- **Frontend:** Vanilla JavaScript (ES modules), Bootstrap 5, custom CSS — no build step, no framework, fetches relative to its own origin (`/api/...`) so it works unmodified in any environment
 - **Date & Time:** Hand-rolled DST-accurate boundary computations (`Intl.DateTimeFormat`) in [`src/utils/profileTime.js`](src/utils/profileTime.js), mirrored client-side in [`frontend/js/timeUtils.js`](frontend/js/timeUtils.js)
 
 ---
@@ -41,11 +43,17 @@ The **backend** is an Express 4 REST API on Node.js with direct **Supabase (Post
 
 ```
 ├── db/
-│   ├── schema.sql              # PostgreSQL DDL — tables, indexes, constraints
+│   ├── schema.sql              # PostgreSQL DDL — tables, indexes, constraints.
+│   │                             # Must be followed by an explicit service_role
+│   │                             # grant (see Database setup below) on any project
+│   │                             # created with "Automatically expose new tables"
+│   │                             # turned off.
 │   └── schema-erd.{svg,dot,mmd} # Entity-relationship diagram (regenerate via mermaid-cli
 │                                 # after schema changes: npx mmdc -i db/schema-erd.mmd -o db/schema-erd.svg)
 ├── src/
-│   ├── server.js               # Express entrypoint, route mounting, cron jobs, CORS/rate-limit wiring
+│   ├── server.js               # Express entrypoint: API routes, static frontend
+│   │                             # serving, cron jobs, CORS/rate-limit wiring, 404
+│   │                             # fallback — all in one process
 │   ├── config/
 │   │   ├── env.js              # Environment variable parsing and defaults
 │   │   └── supabase.js         # Supabase client singleton (service role)
@@ -64,13 +72,14 @@ The **backend** is an Express 4 REST API on Node.js with direct **Supabase (Post
 │       └── profileTime.js       # DST-safe day/week/month boundary computations
 ├── frontend/
 │   ├── index.html              # Login/signup
-│   ├── 403.html / 404.html     # Static error pages (403 is a fallback only — the app
-│   │                             # self-heals the one real 403 case; see Security section)
+│   ├── 403.html / 404.html     # Static error pages, served by server.js's own
+│   │                             # fallback handler (see Security section)
 │   ├── pages/                  # One HTML file per feature (dashboard, tasks, notes, habits,
 │   │                             # calendar, reminders, bin, settings, change-password)
 │   ├── js/
 │   │   ├── api.js              # Fetch wrapper: auth header injection, token refresh,
-│   │   │                         # stale cross-profile-filter self-heal on 403
+│   │   │                         # stale cross-profile-filter self-heal on 403.
+│   │   │                         # API_BASE_URL is '/api' — relative, works in any env.
 │   │   ├── layout.js            # Shared navbar, profile switcher, theme selector
 │   │   ├── themeUtils.js        # Theme resolution, favicon updates, cross-tab sync
 │   │   ├── timeUtils.js         # Client-side timezone/date formatting
@@ -81,10 +90,6 @@ The **backend** is an Express 4 REST API on Node.js with direct **Supabase (Post
 │   └── css/
 │       └── app.css              # The only stylesheet — Neobrutalist design system
 ├── tests/                       # In-memory test suite — see Testing section
-├── netlify.toml                 # Netlify redirect: any unmatched route → 404.html (this is
-│                                  # what actually makes the 404 page work in production; the
-│                                  # app's own JS never navigates there, since there are no
-│                                  # deep-linked single-item routes to 404 on)
 ├── api.md                       # API route and schema reference
 └── package.json
 ```
@@ -97,13 +102,15 @@ This section exists because the security model has real, specific tradeoffs wort
 
 **Ownership pattern.** Every single-item GET/PATCH/DELETE across all 8 resource controllers (task, note, habit, reminder, calendar event, calendar, dashboard, bin) fetches the row by ID *alone*, then separately verifies the caller owns its `profile_id` via `verifyProfileOwnership`. On failure it returns **404, never 403** — so a request for something that exists but isn't yours looks identical to a request for something that doesn't exist at all. Cross-profile aggregation endpoints (dashboard, calendar) route through `resolveProfileIds` instead, which validates every requested profile ID against what the caller actually owns and throws 403 only when an explicitly-named profile ID isn't theirs.
 
-**That 403 case is the only place the backend ever returns 403.** In practice it only fires when the frontend's cross-profile filter bar has a stale profile ID cached in `localStorage` (e.g. a profile was deleted in another tab). `api.js` detects this specific case and self-heals — clears the stale selection and retries — rather than showing an error page. `403.html` exists as a fallback for any other, currently-hypothetical, forbidden case. `404.html` is reached in production via `netlify.toml`'s catch-all redirect for unmatched URLs; the app's own JavaScript never navigates there, since nothing in the app deep-links to a single item by ID.
+**That 403 case is the only place the backend ever returns 403.** In practice it only fires when the frontend's cross-profile filter bar has a stale profile ID cached in `localStorage` (e.g. a profile was deleted in another tab). `api.js` detects this specific case and self-heals — clears the stale selection and retries — rather than showing an error page. `403.html`/`404.html` are served directly by `server.js`'s own fallback handler, after every API route — there is no separate hosting-platform redirect involved.
 
-**No database-level backstop.** The Supabase client is created with the **service-role key**, which bypasses Row Level Security entirely. Every authorization guarantee in this app lives in the application code described above — there is no second layer of defense if an ownership check is ever missing or wrong. Given this exact pattern has been silently dropped by tooling more than once in this project's history, treat any change touching `profileAccess.js` or a controller's single-item handlers as security-critical and verify it by actually running an adversarial cross-account request, not by reading the diff.
+**No database-level RLS policies, but access is deny-by-default at the database too.** The Supabase client connects with the **service-role key**, which always bypasses RLS regardless of policy state — so RLS policies, if written, would have zero effect on this backend's own traffic. The production Supabase project has "Automatically expose new tables" **disabled** and automatic RLS **enabled**, meaning the `anon`/`authenticated` roles (which this app's frontend never actually uses — it talks only to this Express backend, never to Supabase directly) have no implicit access to anything. `service_role`'s own access is granted explicitly, since disabling auto-expose removes its implicit grants too — see Database setup below. Every real authorization guarantee for this app's actual users still lives entirely in the application code described above; this is a second lock on a door nobody currently uses, not a second line of defense for the door that matters. Given this exact ownership pattern has been silently dropped by tooling more than once in this project's history, treat any change touching `profileAccess.js` or a controller's single-item handlers as security-critical and verify it by actually running an adversarial cross-account request, not by reading the diff.
 
 **Rate limiting is disabled outside `NODE_ENV=production`.** This is intentional for local development, but it means **you must explicitly confirm `NODE_ENV=production` is set on your deployment host** — some platforms don't default it, and if it's missing, login/signup/refresh ship with zero brute-force protection with no visible symptom until it's exploited. `PATCH /auth/username` currently has no rate limiter at all, unlike every other mutating auth-adjacent endpoint.
 
 **Dependency vulnerabilities.** `npm audit` is clean except for one deliberately-deferred item: `uuid` (moderate, via `node-cron`) requires bumping `node-cron` to a new major version, which is a breaking change to the cron job API. Test that upgrade against the actual reminder/purge cron jobs before taking it.
+
+**Account recovery.** There's no self-service "forgot password" flow — not planned at the current scale (a handful of known users). Password resets are handled by a manual script, kept in a separate private repository (never committed here), which hashes a new password with the same `bcrypt` logic as the app and revokes all of that user's existing refresh tokens. It's run locally against the production Supabase project directly, with no exposed endpoint.
 
 ---
 
@@ -119,12 +126,25 @@ This section exists because the security model has real, specific tradeoffs wort
 ```bash
 git clone <repository-url>
 cd second-brain
-npm install
+npm install --omit=dev
 ```
 
 ### 2. Database
 
-Open your Supabase project's SQL Editor, paste the full contents of [`db/schema.sql`](db/schema.sql), and run it.
+Open your Supabase project's SQL Editor and run `db/schema.sql`, then — **only if you created the project with "Automatically expose new tables" turned off** (the recommended, current setting) — also run:
+
+```sql
+grant usage on schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
+alter default privileges for role postgres in schema public
+  grant select, insert, update, delete on tables to service_role;
+alter default privileges for role postgres in schema public
+  grant usage, select on sequences to service_role;
+```
+
+Skipping this on a fresh project results in `permission denied for table ...` errors on every request, including a silent cron failure you'll only see in server logs.
 
 ### 3. Environment
 
@@ -139,33 +159,23 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 | Variable | Required | Default | Notes |
 |---|---|---|---|
-| `PORT` | No | `4000` | |
+| `PORT` | No | `4000` | Set automatically by most hosting platforms — don't override in production |
 | `NODE_ENV` | No | `development` | **Set to `production` on your deploy host** — see Security section |
 | `SUPABASE_URL` | Yes | — | |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | — | Bypasses RLS — see Security section |
-| `JWT_ACCESS_SECRET` | Yes | — | |
+| `JWT_ACCESS_SECRET` | Yes | — | Use a different value per environment; dev and prod secrets should never match |
 | `JWT_ACCESS_EXPIRES_IN` | No | `15m` | |
 | `JWT_REFRESH_EXPIRES_IN_DAYS` | No | `30` | |
-| `CORS_ORIGIN` | No | several localhost ports | Comma-separated list; already supports multiple origins |
+| `CORS_ORIGIN` | No | several localhost ports | Largely irrelevant in production now that the frontend is served same-origin; still used by local dev tooling that hits the API from a different port |
 
-### 4. Run the backend
+### 4. Run it
 
 ```bash
 npm run dev    # auto-reload
 npm start      # standard
 ```
 
-API listens on `http://localhost:4000`. Health check: `GET /health`.
-
-### 5. Run the frontend
-
-Static files, no build step. Serve `frontend/` on port 5500 to match the default `CORS_ORIGIN`:
-
-```bash
-npx serve frontend -l 5500
-```
-
-Open `http://localhost:5500`.
+One process serves everything — API and frontend together. Open `http://localhost:4000`. Health check: `GET /health`.
 
 ---
 
@@ -201,25 +211,30 @@ node tests/frontend-dst.js
 
 There's currently no browser-based end-to-end suite (Playwright/Cypress) — UI-level flows are tested manually.
 
+
 ---
 
 ## Deployment
 
-Backend and frontend deployment is scoped but deliberately deferred until the feature set is stable — see Roadmap.
+Live at **https://second-brain-1-glct.onrender.com**, on **Render**, as a single Web Service 
 
-**Backend (Render or similar):** build `npm install`, start `npm start`, set all env vars from the table above in the host dashboard including `NODE_ENV=production` and `CORS_ORIGIN` set to your actual frontend URL.
+- **Build Command:** `npm install --omit=dev` (plain `npm install` would also pull the `mermaid-cli` devDependency and its bundled Chromium download, unnecessarily)
+- **Start Command:** `npm start`
+- Env vars as in the table above, with `NODE_ENV=production` and a production-only `JWT_ACCESS_SECRET`
+- `CORS_ORIGIN` isn't meaningfully used in this deployment shape — the frontend is served by this same process, same origin, so cross-origin requests don't occur in the first place
 
-**Frontend (Netlify or similar):** publish directory `frontend`, no build command. Before deploying, update `API_BASE_URL` in `frontend/js/api.js` from `localhost` to your deployed backend URL — this is a manual step by design, not an oversight.
+Database is a Supabase project in the `ap-southeast-1` (Singapore) region — chosen to co-locate with the backend's own region, since backend↔database round trips happen far more often per request than the single user↔backend hop, so pairing backend and DB regions matters more for latency than matching either one individually to end-user location.
+
+No separate frontend deployment — `frontend/` is served by `express.static` from within `server.js`, so there's exactly one Render service, one URL, one thing to keep awake.
 
 ---
 
 ## Roadmap / Known Gaps
 
-- **Redis caching (Upstash):** the dashboard aggregation endpoint is a designed cache-aside candidate, not yet implemented — deferred until there's a live environment to measure against.
-- **Deployment:** target is Render (backend) + Netlify (frontend) with separate dev/prod Supabase projects; not started.
 - **`node-cron` / `uuid` upgrade:** deferred breaking change, see Security section.
 - **Browser-based E2E tests:** not yet implemented; see Testing section.
-- **Row Level Security:** not implemented — see Security section for the current risk model.
+- **Self-service password reset:** not implemented by design at current scale; see Security section's Account Recovery note.
+- **Row Level Security policies:** not written — `service_role` bypasses RLS regardless, so the database relies on explicit grants plus application-layer ownership checks, not RLS policies, as its actual authorization model.
 
 ## API Reference
 

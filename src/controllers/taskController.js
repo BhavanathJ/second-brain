@@ -1,7 +1,7 @@
 const taskService = require('../services/taskService');
 const binService = require('../services/binService');
 const noteService = require('../services/noteService');
-const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
+const { resolveProfileIds, verifyProfileOwnership, resolveTargetProfile } = require('../utils/profileAccess');
 
 function parseBoolParam(value) {
     if (value === undefined) return undefined;
@@ -66,13 +66,11 @@ async function createTask(req, res) {
         }
     }
 
-    // Optional: if profile_id is explicitly provided in body, verify ownership
-    const targetProfileId = req.body.profile_id ?? req.profileId;
-    if (req.body.profile_id !== undefined) {
-        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
-        if (!owns) {
-            return res.status(404).json({ error: 'Cannot create task: profile not owned by user.' });
-        }
+    let targetProfileId;
+    try {
+        targetProfileId = await resolveTargetProfile(req);
+    } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
     try {

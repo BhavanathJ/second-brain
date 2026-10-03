@@ -1,6 +1,6 @@
 const reminderService = require('../services/reminderService');
 const binService = require('../services/binService');
-const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
+const { resolveProfileIds, verifyProfileOwnership, resolveTargetProfile } = require('../utils/profileAccess');
 
 const VALID_ENTITY_TYPES = ['task', 'note', 'habit', 'calendar_event'];
 
@@ -68,12 +68,38 @@ async function createReminder(req, res) {
         });
     }
 
-    // Optional: if profile_id is explicitly provided in body, verify ownership
-    const targetProfileId = req.body.profile_id ?? req.profileId;
-    if (req.body.profile_id !== undefined) {
-        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
-        if (!owns) {
-            return res.status(404).json({ error: 'Cannot create reminder: profile not owned by user.' });
+    let targetProfileId;
+    try {
+        targetProfileId = await resolveTargetProfile(req);
+    } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
+    if (entity_type && entity_id) {
+        let exists = false;
+        try {
+            if (entity_type === 'task') {
+                const taskService = require('../services/taskService');
+                const t = await taskService.getTaskByIdOnly(entity_id);
+                if (t && t.profile_id === targetProfileId) exists = true;
+            } else if (entity_type === 'note') {
+                const noteService = require('../services/noteService');
+                const n = await noteService.getNoteByIdOnly(entity_id);
+                if (n && n.profile_id === targetProfileId) exists = true;
+            } else if (entity_type === 'habit') {
+                const habitService = require('../services/habitService');
+                const h = await habitService.getHabitByIdOnly(entity_id);
+                if (h && h.profile_id === targetProfileId) exists = true;
+            } else if (entity_type === 'calendar_event') {
+                const calendarEventService = require('../services/calendarEventService');
+                const c = await calendarEventService.getCalendarEventByIdOnly(entity_id);
+                if (c && c.profile_id === targetProfileId) exists = true;
+            }
+        } catch (err) {
+            console.error('Error validating entity_id:', err);
+        }
+        if (!exists) {
+            return res.status(400).json({ error: 'Linked entity does not exist in the target profile.' });
         }
     }
 

@@ -4,6 +4,7 @@ import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
 import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 function parseTags(input) {
     return input.split(',').map(t => t.trim()).filter(Boolean);
@@ -81,17 +82,18 @@ async function loadNotes(tags = []) {
     const { notes } = await apiFetch(url);
     allNotes = notes;
 
-    // Cache profiles for badge rendering
-    const profileIds = [...new Set(notes.map(n => n.profile_id).filter(Boolean))];
-    if (profileIds.length > 0) {
-        try {
-            const { profiles } = await apiFetch('/profiles');
-            profilesCache = profiles;
-        } catch (err) {
-            console.error('Failed to load profiles for badges:', err);
-            profilesCache = [];
-        }
+    // Always fetch profiles so the dropdown works even if list is empty
+    try {
+        const { profiles } = await apiFetch('/profiles');
+        profilesCache = profiles;
+    } catch (err) {
+        console.error('Failed to load profiles:', err);
+        profilesCache = [];
     }
+
+    const captureContainer = document.getElementById('captureProfileTargetContainer');
+    captureContainer.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
+    bindProfileTargetSelect(captureContainer);
 
     render();
 }
@@ -179,6 +181,10 @@ function openConvertModal(noteId, noteContent) {
     document.getElementById('convertTaskUrgent').checked = false;
     document.getElementById('convertTaskImportant').checked = false;
 
+    const convertContainer = document.getElementById('convertProfileTargetContainer');
+    convertContainer.innerHTML = renderProfileTargetSelect(profilesCache, note.profile_id);
+    bindProfileTargetSelect(convertContainer);
+
     convertModal.show();
 }
 
@@ -191,12 +197,17 @@ async function handleConvertSubmit(e) {
         showToast('Task title is required');
         return;
     }
+    const note = allNotes.find(n => n.id === noteId);
+    if (!note) return;
+    const { payload: targetPayload, targetName, isDifferent } = getProfileTargetPayload(document.getElementById('convertNoteForm'), profilesCache, note.profile_id);
+
     const payload = {
         title,
         description: document.getElementById('convertTaskDescription').value.trim(),
         urgent: document.getElementById('convertTaskUrgent').checked,
         important: document.getElementById('convertTaskImportant').checked,
         due_at: localInputToISO(document.getElementById('convertTaskDueAt').value),
+        ...targetPayload
     };
 
     try {
@@ -205,7 +216,11 @@ async function handleConvertSubmit(e) {
             body: JSON.stringify(payload)
         });
         convertModal.hide();
-        showToast('Converted to task', 'success');
+        if (isDifferent) {
+            showToast(`Task created in ${targetName}`, 'success');
+        } else {
+            showToast('Converted to task', 'success');
+        }
         await loadNotes(currentFilterTags());
     } catch (err) {
         // 409 = already converted (e.g. by another tab) — refresh to show the real state
@@ -235,11 +250,16 @@ async function handleCaptureSubmit(e) {
     e.preventDefault();
     const content = document.getElementById('captureContent').value.trim();
     const tags = parseTags(document.getElementById('captureTags').value);
+    const { payload: targetPayload, targetName, isDifferent } = getProfileTargetPayload(document.getElementById('captureForm'), profilesCache, getActiveProfileId());
 
     try {
-        await apiFetch('/notes', { method: 'POST', body: JSON.stringify({ content, tags }) });
+        await apiFetch('/notes', { method: 'POST', body: JSON.stringify({ content, tags, ...targetPayload }) });
         document.getElementById('captureForm').reset();
-        showToast('Note captured', 'success');
+        if (isDifferent) {
+            showToast(`Note captured in ${targetName}`, 'success');
+        } else {
+            showToast('Note captured', 'success');
+        }
         await loadNotes(currentFilterTags());
     } catch (err) {
         showToast('Failed to save note: ' + err.message);

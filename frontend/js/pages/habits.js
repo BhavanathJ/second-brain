@@ -5,6 +5,7 @@ import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
 import { getLocalDateString, addDays, getLocalWeekStartDateString } from '../timeUtils.js';
 import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 function dayLabel(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -57,16 +58,13 @@ async function loadHabits() {
         loggedDates: new Set(logsPerHabit[i].logs.filter(l => l.completed).map(l => l.log_date)),
     }));
 
-    // Cache profiles for badge rendering
-    const profileIds = [...new Set(habits.map(h => h.profile_id).filter(Boolean))];
-    if (profileIds.length > 0) {
-        try {
-            const { profiles } = await apiFetch('/profiles');
-            profilesCache = profiles;
-        } catch (err) {
-            console.error('Failed to load profiles for badges:', err);
-            profilesCache = [];
-        }
+    // Always fetch profiles so the dropdown works even if list is empty
+    try {
+        const { profiles } = await apiFetch('/profiles');
+        profilesCache = profiles;
+    } catch (err) {
+        console.error('Failed to load profiles:', err);
+        profilesCache = [];
     }
 
     render();
@@ -167,9 +165,13 @@ function openModal(habitId) {
         document.getElementById('habitId').value = habit.id;
         document.getElementById('habitTitle').value = habit.title;
         document.getElementById('habitTarget').value = habit.target_per_week;
+        document.getElementById('profileTargetContainer').innerHTML = '';
     } else {
         document.getElementById('habitModalTitle').textContent = 'Add Habit';
         document.getElementById('habitTarget').value = 7;
+        const container = document.getElementById('profileTargetContainer');
+        container.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
+        bindProfileTargetSelect(container);
     }
 
     modal.show();
@@ -178,19 +180,27 @@ function openModal(habitId) {
 async function handleSubmit(e) {
     e.preventDefault();
     const habitId = document.getElementById('habitId').value;
+    const { payload: targetPayload, targetName, isDifferent } = getProfileTargetPayload(document.getElementById('habitForm'), profilesCache, getActiveProfileId());
+
     const payload = {
         title: document.getElementById('habitTitle').value.trim(),
         target_per_week: Number(document.getElementById('habitTarget').value),
+        ...targetPayload
     };
 
     try {
         if (habitId) {
             await apiFetch(`/habits/${habitId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+            showToast('Habit saved', 'success');
         } else {
             await apiFetch('/habits', { method: 'POST', body: JSON.stringify(payload) });
+            if (isDifferent) {
+                showToast(`Habit created in ${targetName}`, 'success');
+            } else {
+                showToast('Habit saved', 'success');
+            }
         }
         modal.hide();
-        showToast('Habit saved', 'success');
         await loadHabits();
     } catch (err) {
         showToast('Failed to save habit: ' + err.message);

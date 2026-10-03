@@ -1,7 +1,7 @@
 const noteService = require('../services/noteService');
 const taskService = require('../services/taskService');
 const binService = require('../services/binService');
-const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
+const { resolveProfileIds, verifyProfileOwnership, resolveTargetProfile } = require('../utils/profileAccess');
 
 async function listNotes(req, res) {
     let profileIds;
@@ -50,13 +50,11 @@ async function createNote(req, res) {
         return res.status(400).json({ error: 'Content is required.' });
     }
 
-    // Optional: if profile_id is explicitly provided in body, verify ownership
-    const targetProfileId = req.body.profile_id ?? req.profileId;
-    if (req.body.profile_id !== undefined) {
-        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
-        if (!owns) {
-            return res.status(404).json({ error: 'Cannot create note: profile not owned by user.' });
-        }
+    let targetProfileId;
+    try {
+        targetProfileId = await resolveTargetProfile(req);
+    } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
     try {
@@ -147,6 +145,13 @@ async function convertNoteToTask(req, res) {
             });
         }
 
+        let targetProfileId;
+        try {
+            targetProfileId = await resolveTargetProfile(req, note.profile_id);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({ error: err.message });
+        }
+
         // Use the user-provided title from the form, or fall back to first 200 chars of content
         const title = (req.body.title && req.body.title.trim()) ? req.body.title.trim() : note.content.slice(0, 200);
         // Use user-provided description if provided, otherwise use full note content
@@ -155,8 +160,8 @@ async function convertNoteToTask(req, res) {
         const important = Boolean(req.body.important);
         const due_at = req.body.due_at ? new Date(req.body.due_at) : null;
 
-        // Create the task under the NOTE's own profile_id (not req.profileId)
-        const task = await taskService.createTask(note.profile_id, {
+        // Create the task under the resolved target profile
+        const task = await taskService.createTask(targetProfileId, {
             title,
             description,
             urgent,
@@ -164,23 +169,26 @@ async function convertNoteToTask(req, res) {
             due_at,
         });
 
-        const updatedNote = await noteService.markNoteConverted(
-            note.profile_id,
-            note.id,
-            task.id
-        );
+        let updatedNote = note;
+        if (targetProfileId === note.profile_id) {
+            updatedNote = await noteService.markNoteConverted(
+                note.profile_id,
+                note.id,
+                task.id
+            );
 
-        if (!updatedNote) {
-            // Lost the race — someone else converted this note between our
-            // check above and this write. Clean up the orphan task we just
-            // created rather than leaving a duplicate, untethered task behind.
-            await taskService.hardDeleteTask(note.profile_id, task.id);
+            if (!updatedNote) {
+                // Lost the race — someone else converted this note between our
+                // check above and this write. Clean up the orphan task we just
+                // created rather than leaving a duplicate, untethered task behind.
+                await taskService.hardDeleteTask(targetProfileId, task.id);
 
-            const currentNote = await noteService.getNoteById(note.profile_id, note.id);
-            return res.status(409).json({
-                error: 'This note has already been converted to a task.',
-                taskId: currentNote?.converted_task_id ?? null,
-            });
+                const currentNote = await noteService.getNoteById(note.profile_id, note.id);
+                return res.status(409).json({
+                    error: 'This note has already been converted to a task.',
+                    taskId: currentNote?.converted_task_id ?? null,
+                });
+            }
         }
 
         return res.status(201).json({ task, note: updatedNote });

@@ -5,6 +5,7 @@ import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
 import { formatDateTimeWithTZ } from '../timeUtils.js';
 import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 let timeZone = 'UTC';
 let allTasks = [];
@@ -80,16 +81,13 @@ async function loadTasks() {
     const { tasks } = await apiFetch(url);
     allTasks = tasks;
 
-    // Cache profiles for badge rendering
-    const profileIds = [...new Set(tasks.map(t => t.profile_id).filter(Boolean))];
-    if (profileIds.length > 0) {
-        try {
-            const { profiles } = await apiFetch('/profiles');
-            profilesCache = profiles;
-        } catch (err) {
-            console.error('Failed to load profiles for badges:', err);
-            profilesCache = [];
-        }
+    // Always fetch profiles so the dropdown works even if list is empty
+    try {
+        const { profiles } = await apiFetch('/profiles');
+        profilesCache = profiles;
+    } catch (err) {
+        console.error('Failed to load profiles:', err);
+        profilesCache = [];
     }
 
     render();
@@ -166,8 +164,12 @@ function openModal(taskId) {
         document.getElementById('taskDueAt').value = isoToLocalInput(task.due_at);
         document.getElementById('taskUrgent').checked = task.urgent;
         document.getElementById('taskImportant').checked = task.important;
+        document.getElementById('profileTargetContainer').innerHTML = '';
     } else {
         document.getElementById('taskModalTitle').textContent = 'Add Task';
+        const container = document.getElementById('profileTargetContainer');
+        container.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
+        bindProfileTargetSelect(container);
     }
 
     modal.show();
@@ -202,22 +204,30 @@ async function handleSubmit(e) {
     e.preventDefault();
 
     const taskId = document.getElementById('taskId').value;
+    const { payload: targetPayload, targetName, isDifferent } = getProfileTargetPayload(document.getElementById('taskForm'), profilesCache, getActiveProfileId());
+
     const payload = {
         title: document.getElementById('taskTitle').value.trim(),
         description: document.getElementById('taskDescription').value.trim() || null,
         due_at: localInputToISO(document.getElementById('taskDueAt').value),
         urgent: document.getElementById('taskUrgent').checked,
         important: document.getElementById('taskImportant').checked,
+        ...targetPayload
     };
 
     try {
         if (taskId) {
             await apiFetch(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+            showToast('Task saved', 'success');
         } else {
             await apiFetch('/tasks', { method: 'POST', body: JSON.stringify(payload) });
+            if (isDifferent) {
+                showToast(`Task created in ${targetName}`, 'success');
+            } else {
+                showToast('Task saved', 'success');
+            }
         }
         modal.hide();
-        showToast('Task saved', 'success');
         await loadTasks();
     } catch (err) {
         showToast('Failed to save task: ' + err.message);

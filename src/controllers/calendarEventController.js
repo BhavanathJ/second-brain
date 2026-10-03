@@ -1,6 +1,6 @@
 const calendarEventService = require('../services/calendarEventService');
 const binService = require('../services/binService');
-const { resolveProfileIds, verifyProfileOwnership } = require('../utils/profileAccess');
+const { resolveProfileIds, verifyProfileOwnership, resolveTargetProfile } = require('../utils/profileAccess');
 
 async function listCalendarEvents(req, res) {
     let profileIds;
@@ -50,13 +50,11 @@ async function createCalendarEvent(req, res) {
         return res.status(400).json({ error: 'ends_at must be after starts_at.' });
     }
 
-    // Optional: if profile_id is explicitly provided in body, verify ownership
-    const targetProfileId = req.body.profile_id ?? req.profileId;
-    if (req.body.profile_id !== undefined) {
-        const owns = await verifyProfileOwnership(req.userId, targetProfileId);
-        if (!owns) {
-            return res.status(404).json({ error: 'Cannot create calendar event: profile not owned by user.' });
-        }
+    let targetProfileId;
+    try {
+        targetProfileId = await resolveTargetProfile(req);
+    } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
     try {

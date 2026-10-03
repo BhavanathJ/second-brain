@@ -41,4 +41,50 @@ async function verifyProfileOwnership(userId, profileId) {
     return !!profile;
 }
 
-module.exports = { resolveProfileIds, verifyProfileOwnership };
+// Resolves target_profile_id from the request body. If omitted, returns defaultProfileId.
+// If provided and different, validates it is a string UUID and verifies ownership using verifyProfileOwnership.
+// Throws a 400 error on any validation or ownership failure (never 403).
+async function resolveTargetProfile(req, defaultProfileId = req.profileId) {
+    if (req.body.profile_id !== undefined) {
+        if (req.body.profile_id !== null && (typeof req.body.profile_id !== 'string' || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(req.body.profile_id))) {
+            const err = new Error('Invalid profile_id format.');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (req.body.profile_id !== null) {
+            const ownsLegacy = await verifyProfileOwnership(req.userId, req.body.profile_id);
+            if (!ownsLegacy) {
+                const err = new Error('Cannot create item: profile not owned by user.');
+                err.statusCode = 404;
+                throw err;
+            }
+        }
+    }
+
+    const targetProfileId = req.body.target_profile_id;
+    
+    if (targetProfileId === undefined) {
+        return defaultProfileId;
+    }
+    
+    if (typeof targetProfileId !== 'string' || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(targetProfileId) && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(targetProfileId)) {
+        const err = new Error('Invalid target_profile_id format.');
+        err.statusCode = 400;
+        throw err;
+    }
+    
+    if (targetProfileId === defaultProfileId) {
+        return defaultProfileId;
+    }
+    
+    const owns = await verifyProfileOwnership(req.userId, targetProfileId);
+    if (!owns) {
+        const err = new Error('Target profile not found or not owned by user.');
+        err.statusCode = 400;
+        throw err;
+    }
+    
+    return targetProfileId;
+}
+
+module.exports = { resolveProfileIds, verifyProfileOwnership, resolveTargetProfile };

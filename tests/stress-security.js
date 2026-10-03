@@ -369,5 +369,221 @@ function testCorsMiddleware(origin, corsOrigin, nodeEnv) {
   // In our mock, we test the logical order: filter by deleted_at FIRST, then fire
   console.log(`  [info] fireReminders logic: filter deleted_at=null FIRST, then check remind_at <= now`);
 
+  // ================= TARGET PROFILE VALIDATION & CROSS-PROFILE =================
+  section('target_profile_id validation and cross-profile create behaviors');
+
+  const profile2 = mock.seed('profiles', { user_id: user.id, name: 'Work' });
+  const otherUser = mock.seed('users', { id: 'u2', email: 'other@example.com', username: 'other' });
+  const otherProfile = mock.seed('profiles', { user_id: otherUser.id, name: 'Other' });
+
+  // 1. Stray body.profile_id is ignored (item lands in active profile)
+  // 1. Stray body.profile_id is ignored test removed as per new 404 logic
+
+  // 2. target_profile_id valid format but not owned → 400 (not 403), zero rows written
+  {
+    const beforeCount = mock._db.tasks.length;
+    const r = await call(require('../src/controllers/taskController').createTask, {
+      profileId: profile.id,
+      body: { title: 'Adversarial Task', target_profile_id: otherProfile.id }
+    });
+    check(r.status === 400, 'Unowned target_profile_id → 400', `got ${r.status}`);
+    check(mock._db.tasks.length === beforeCount, 'Zero rows written on unowned target profile');
+  }
+
+  // 3. target_profile_id malformed UUID → 400, zero rows written
+  {
+    const beforeCount = mock._db.tasks.length;
+    const r = await call(require('../src/controllers/taskController').createTask, {
+      profileId: profile.id,
+      body: { title: 'Malformed Target', target_profile_id: 'not-a-uuid' }
+    });
+    check(r.status === 400, 'Malformed target_profile_id → 400', `got ${r.status}`);
+    check(mock._db.tasks.length === beforeCount, 'Zero rows written on malformed target_profile_id');
+  }
+
+  // 4. Valid target_profile_id owned by user → creates in target profile
+  {
+    const r = await call(require('../src/controllers/taskController').createTask, {
+      profileId: profile.id,
+      body: { title: 'Valid Target', target_profile_id: profile2.id }
+    });
+    check(r.status === 201, 'Valid owned target_profile_id → 201', `got ${r.status}`);
+    const task = mock._db.tasks.find(t => t.id === r.body.task.id);
+    check(task.profile_id === profile2.id, 'Task created in target profile');
+  }
+
+  // 5. createReminder: entity_id valid in target profile
+  {
+    const taskInProfile2 = mock.seed('tasks', { profile_id: profile2.id, title: 'Task in P2' });
+    const r = await call(reminderController.createReminder, {
+      profileId: profile.id, // active profile is profile 1
+      body: { 
+        title: 'Remind me', 
+        remind_at: '2027-01-01T10:00:00Z', 
+        entity_type: 'task', 
+        entity_id: taskInProfile2.id,
+        target_profile_id: profile2.id 
+      }
+    });
+    check(r.status === 201, 'Reminder with entity_id in target profile → 201', `got ${r.status}`);
+  }
+
+  // 6. createReminder: entity_id not in target profile → 400
+  {
+    const taskInProfile1 = mock.seed('tasks', { profile_id: profile.id, title: 'Task in P1' });
+    const beforeCount = mock._db.reminders.length;
+    const r = await call(reminderController.createReminder, {
+      profileId: profile.id,
+      body: { 
+        title: 'Remind me', 
+        remind_at: '2027-01-01T10:00:00Z', 
+        entity_type: 'task', 
+        entity_id: taskInProfile1.id,
+        target_profile_id: profile2.id // trying to create in P2 but link to P1 task
+      }
+    });
+    check(r.status === 400, 'Reminder with entity_id not in target profile → 400', `got ${r.status}`);
+    check(mock._db.reminders.length === beforeCount, 'Zero rows written on invalid reminder entity_id');
+  }
+
+  // 7. convertNoteToTask: default to note.profile_id
+  {
+    const note = mock.seed('notes', { profile_id: profile2.id, content: 'Note in P2' });
+    const r = await call(require('../src/controllers/noteController').convertNoteToTask, {
+      profileId: profile.id, // active is P1
+      params: { id: note.id },
+      body: { title: 'Converted Task' }
+    });
+    check(r.status === 201, 'convertNoteToTask cross-profile active, default target → 201', `got ${r.status}`);
+    const task = mock._db.tasks.find(t => t.id === r.body.task.id);
+    check(task.profile_id === profile2.id, 'Task landed in note.profile_id (P2)');
+    const updatedNote = mock._db.notes.find(n => n.id === note.id);
+    check(updatedNote.converted_task_id === task.id, 'Note converted_task_id linked (same profile)');
+  }
+
+  // 8. convertNoteToTask: target != note.profile_id → no link
+  {
+    const note = mock.seed('notes', { profile_id: profile2.id, content: 'Note in P2 again' });
+    const r = await call(require('../src/controllers/noteController').convertNoteToTask, {
+      profileId: profile.id, // active is P1
+      params: { id: note.id },
+      body: { title: 'Converted Task Target P1', target_profile_id: profile.id }
+    });
+    check(r.status === 201, 'convertNoteToTask explicit target != note profile → 201', `got ${r.status}`);
+    const task = mock._db.tasks.find(t => t.id === r.body.task.id);
+    check(task.profile_id === profile.id, 'Task landed in target_profile_id (P1)');
+    const updatedNote = mock._db.notes.find(n => n.id === note.id);
+    check(updatedNote.converted_task_id === null, 'Note converted_task_id NOT linked (cross profile)');
+  }
+
+  // 9. Legacy body.profile_id tests
+  const legacyControllers = {
+    createTask: {
+      fn: require('../src/controllers/taskController').createTask,
+      body: { title: 'Legacy Task' },
+      table: 'tasks'
+    },
+    createCalendarEvent: {
+      fn: require('../src/controllers/calendarEventController').createCalendarEvent,
+      body: { title: 'Legacy Event', starts_at: '2027-01-01T10:00:00Z' },
+      table: 'calendar_events'
+    },
+    createHabit: {
+      fn: require('../src/controllers/habitController').createHabit,
+      body: { title: 'Legacy Habit', target_per_week: 3 },
+      table: 'habits'
+    },
+    createReminder: {
+      fn: require('../src/controllers/reminderController').createReminder,
+      body: { title: 'Legacy Reminder', remind_at: '2027-01-01T10:00:00Z' },
+      table: 'reminders'
+    },
+    createNote: {
+      fn: require('../src/controllers/noteController').createNote,
+      body: { content: 'Legacy Note' },
+      table: 'notes'
+    }
+  };
+
+  for (const [name, setup] of Object.entries(legacyControllers)) {
+    // another user's profile_id -> 404
+    {
+      const beforeCount = mock._db[setup.table].length;
+      const r = await call(setup.fn, {
+        profileId: profile.id,
+        body: { ...setup.body, profile_id: otherProfile.id }
+      });
+      check(r.status === 404, `${name} with another user's profile_id → 404`, `got ${r.status}`);
+      check(mock._db[setup.table].length === beforeCount, `${name} zero rows written on unowned legacy profile_id`);
+    }
+
+    // malformed profile_id -> 400
+    {
+      const beforeCount = mock._db[setup.table].length;
+      const r = await call(setup.fn, {
+        profileId: profile.id,
+        body: { ...setup.body, profile_id: 'not-a-uuid' }
+      });
+      check(r.status === 400, `${name} with malformed profile_id → 400`, `got ${r.status}`);
+      check(mock._db[setup.table].length === beforeCount, `${name} zero rows written on malformed profile_id`);
+    }
+  }
+
+  // convert with another user's profile_id -> 404
+  {
+    const note = mock.seed('notes', { profile_id: profile.id, content: 'To convert' });
+    const beforeCount = mock._db.tasks.length;
+    const r = await call(require('../src/controllers/noteController').convertNoteToTask, {
+      profileId: profile.id,
+      params: { id: note.id },
+      body: { title: 'Convert', profile_id: otherProfile.id }
+    });
+    check(r.status === 404, `convertNoteToTask with another user's profile_id → 404`, `got ${r.status}`);
+    check(mock._db.tasks.length === beforeCount, `Zero rows written on unowned legacy profile_id in convert`);
+  }
+  
+  // convert malformed profile_id -> 400
+  {
+    const note = mock.seed('notes', { profile_id: profile.id, content: 'To convert malformed' });
+    const beforeCount = mock._db.tasks.length;
+    const r = await call(require('../src/controllers/noteController').convertNoteToTask, {
+      profileId: profile.id,
+      params: { id: note.id },
+      body: { title: 'Convert', profile_id: 'not-a-uuid' }
+    });
+    check(r.status === 400, `convertNoteToTask with malformed profile_id → 400`, `got ${r.status}`);
+    check(mock._db.tasks.length === beforeCount, `Zero rows written on malformed legacy profile_id in convert`);
+  }
+
+  // delete the cross-profile task, then re-convert the note -> 201
+  {
+    const note = mock.seed('notes', { profile_id: profile2.id, content: 'Cross profile base' });
+    
+    // Convert cross-profile
+    const r1 = await call(require('../src/controllers/noteController').convertNoteToTask, {
+      profileId: profile.id,
+      params: { id: note.id },
+      body: { title: 'First Task', target_profile_id: profile.id }
+    });
+    check(r1.status === 201, 'First cross-profile convert → 201', `got ${r1.status}`);
+    
+    const task = mock._db.tasks.find(t => t.id === r1.body.task.id);
+    
+    // Delete the task
+    const r2 = await call(require('../src/controllers/taskController').deleteTask, {
+      profileId: profile.id,
+      params: { id: task.id }
+    });
+    check(r2.status === 204, 'Delete cross-profile task → 204', `got ${r2.status}`);
+
+    // Re-convert
+    const r3 = await call(require('../src/controllers/noteController').convertNoteToTask, {
+      profileId: profile.id,
+      params: { id: note.id },
+      body: { title: 'Second Task', target_profile_id: profile.id }
+    });
+    check(r3.status === 201, 'Re-convert cross-profile note → 201', `got ${r3.status}`);
+  }
+
   summary();
 })();

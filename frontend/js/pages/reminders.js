@@ -5,6 +5,7 @@ import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
 import { formatDateTimeWithTZ } from '../timeUtils.js';
 import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 function isoToLocalInput(isoString) {
     if (!isoString) return '';
@@ -71,16 +72,13 @@ async function loadReminders() {
     const { reminders } = await apiFetch(url);
     allReminders = reminders;
 
-    // Cache profiles for badge rendering
-    const profileIds = [...new Set(reminders.map(r => r.profile_id).filter(Boolean))];
-    if (profileIds.length > 0) {
-        try {
-            const { profiles } = await apiFetch('/profiles');
-            profilesCache = profiles;
-        } catch (err) {
-            console.error('Failed to load profiles for badges:', err);
-            profilesCache = [];
-        }
+    // Always fetch profiles so the dropdown works even if list is empty
+    try {
+        const { profiles } = await apiFetch('/profiles');
+        profilesCache = profiles;
+    } catch (err) {
+        console.error('Failed to load profiles:', err);
+        profilesCache = [];
     }
 
     render();
@@ -135,8 +133,12 @@ function openModal(reminderId) {
         document.getElementById('reminderId').value = reminder.id;
         document.getElementById('reminderTitle').value = reminder.title;
         document.getElementById('reminderRemindAt').value = isoToLocalInput(reminder.remind_at);
+        document.getElementById('profileTargetContainer').innerHTML = '';
     } else {
         document.getElementById('reminderModalTitle').textContent = 'Add Reminder';
+        const container = document.getElementById('profileTargetContainer');
+        container.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
+        bindProfileTargetSelect(container);
     }
 
     modal.show();
@@ -145,19 +147,27 @@ function openModal(reminderId) {
 async function handleSubmit(e) {
     e.preventDefault();
     const reminderId = document.getElementById('reminderId').value;
+    const { payload: targetPayload, targetName, isDifferent } = getProfileTargetPayload(document.getElementById('reminderForm'), profilesCache, getActiveProfileId());
+
     const payload = {
         title: document.getElementById('reminderTitle').value.trim(),
         remind_at: new Date(document.getElementById('reminderRemindAt').value).toISOString(),
+        ...targetPayload
     };
 
     try {
         if (reminderId) {
             await apiFetch(`/reminders/${reminderId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+            showToast('Reminder saved', 'success');
         } else {
             await apiFetch('/reminders', { method: 'POST', body: JSON.stringify(payload) });
+            if (isDifferent) {
+                showToast(`Reminder created in ${targetName}`, 'success');
+            } else {
+                showToast('Reminder saved', 'success');
+            }
         }
         modal.hide();
-        showToast('Reminder saved', 'success');
         await loadReminders();
     } catch (err) {
         showToast('Failed to save reminder: ' + err.message);

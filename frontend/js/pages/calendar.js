@@ -9,6 +9,7 @@ import {
     formatTimeWithTZ,
 } from '../timeUtils.js';
 import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 function labelForDate(dateStr, opts) {
     return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
@@ -345,19 +346,13 @@ async function loadView() {
     const data = await apiFetch(url);
     itemsByDate = bucketData(data);
 
-    // Cache profiles for badge rendering
-    const allItems = Array.from(itemsByDate.values()).flatMap(d =>
-        [...d.tasks, ...d.events, ...d.reminders, ...d.habits]
-    );
-    const profileIds = [...new Set(allItems.map(i => i.profile_id).filter(Boolean))];
-    if (profileIds.length > 0) {
-        try {
-            const { profiles } = await apiFetch('/profiles');
-            profilesCache = profiles;
-        } catch (err) {
-            console.error('Failed to load profiles for badges:', err);
-            profilesCache = [];
-        }
+    // Always fetch profiles so the dropdown works even if list is empty
+    try {
+        const { profiles } = await apiFetch('/profiles');
+        profilesCache = profiles;
+    } catch (err) {
+        console.error('Failed to load profiles:', err);
+        profilesCache = [];
     }
 
     renderCurrentView();
@@ -381,6 +376,8 @@ function switchView(mode) {
 
 async function handleEventSubmit(e) {
     e.preventDefault();
+    const { payload: targetPayload, targetName, isDifferent } = getProfileTargetPayload(document.getElementById('eventForm'), profilesCache, getActiveProfileId());
+
     const payload = {
         title: document.getElementById('eventTitle').value.trim(),
         starts_at: new Date(document.getElementById('eventStartsAt').value).toISOString(),
@@ -388,13 +385,18 @@ async function handleEventSubmit(e) {
             ? new Date(document.getElementById('eventEndsAt').value).toISOString()
             : null,
         location: document.getElementById('eventLocation').value.trim() || null,
+        ...targetPayload
     };
 
     try {
         await apiFetch('/calendar-events', { method: 'POST', body: JSON.stringify(payload) });
         modal.hide();
         document.getElementById('eventForm').reset();
-        showToast('Event saved', 'success');
+        if (isDifferent) {
+            showToast(`Event created in ${targetName}`, 'success');
+        } else {
+            showToast('Event saved', 'success');
+        }
         await loadView();
     } catch (err) {
         showToast('Failed to save event: ' + err.message);
@@ -427,7 +429,12 @@ async function main() {
     document.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', () => switchView(btn.dataset.view));
     });
-    document.getElementById('addEventBtn').addEventListener('click', () => modal.show());
+    document.getElementById('addEventBtn').addEventListener('click', () => {
+        const container = document.getElementById('profileTargetContainer');
+        container.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
+        bindProfileTargetSelect(container);
+        modal.show();
+    });
     document.getElementById('eventForm').addEventListener('submit', handleEventSubmit);
 
     try {

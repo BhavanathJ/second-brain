@@ -1439,9 +1439,6 @@
     box-shadow: 2px 2px 0px var(--sb-shadow-color);
 }
 
-[data-design="neo"][data-theme="dark"] .btn-close {
-    /* Removed filter to keep red cross visible */
-}
 
 /* ============================================================
    TOAST NOTIFICATIONS
@@ -1535,4 +1532,20 @@
 [data-design="neo"] .bin-item,
 [data-design="neo"] .cal-panel-item {
     animation: fadeInUp 0.2s ease-out;
+}
+
+/* Fix faint text inside view modals */
+.form-control-plaintext {
+    color: var(--sb-ink) !important;
+}
+
+/* Hide scrollbars for specific containers to avoid breaking JS calculations */
+html, body, .quadrant > div, .matrix-grid, .dash-section {
+    scrollbar-width: none;
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar,
+.quadrant > div::-webkit-scrollbar, 
+.matrix-grid::-webkit-scrollbar, 
+.dash-section::-webkit-scrollbar {
+    display: none;
 }

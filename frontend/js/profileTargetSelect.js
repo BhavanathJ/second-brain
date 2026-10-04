@@ -50,7 +50,7 @@ export function bindProfileTargetSelect(containerEl) {
     if (!containerEl) return;
     const items = containerEl.querySelectorAll('.profile-target-option');
     if (!items.length) return;
-    
+
     const hiddenInput = containerEl.querySelector('#target_profile_id');
     const colorDot = containerEl.querySelector('.selected-color-dot');
     const nameSpan = containerEl.querySelector('.selected-profile-name');
@@ -61,7 +61,7 @@ export function bindProfileTargetSelect(containerEl) {
             const id = item.dataset.profileId;
             const dot = item.querySelector('span').style.backgroundColor;
             const name = item.textContent.trim();
-            
+
             hiddenInput.value = id;
             colorDot.style.backgroundColor = dot;
             nameSpan.textContent = name;
@@ -77,7 +77,7 @@ export function getProfileTargetPayload(formEl, profilesCache, defaultProfileId)
 
     const targetId = input.value;
     const profile = profilesCache.find(p => p.id === targetId);
-    
+
     return {
         payload: { target_profile_id: targetId },
         targetName: profile ? profile.name : null,

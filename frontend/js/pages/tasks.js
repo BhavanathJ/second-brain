@@ -175,29 +175,34 @@ function openModal(taskId) {
     modal.show();
 }
 
-function openViewModal(taskId) {
+async function openViewModal(taskId) {
     if (!viewModal) {
         const viewModalEl = document.getElementById('viewTaskModal');
         viewModal = new bootstrap.Modal(viewModalEl);
     }
-    const task = allTasks.find(t => t.id === taskId);
-    if (!task) return;
 
-    document.getElementById('viewTaskTitle').textContent = task.title;
-    document.getElementById('viewTaskDescription').textContent = task.description ?? '—';
-    document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTimeWithTZ(task.due_at, timeZone, task.profile_timezone) : '—';
-    document.getElementById('viewTaskStatus').textContent = task.status === 'done' ? 'Done' : 'Pending';
-    document.getElementById('viewTaskUrgent').checked = task.urgent;
-    document.getElementById('viewTaskImportant').checked = task.important;
+    try {
+        const { task } = await apiFetch(`/tasks/${taskId}`);
+        if (!task) return;
 
-    // Set up Edit button to close view modal and open edit modal
-    const editBtn = document.getElementById('viewTaskEditBtn');
-    editBtn.onclick = () => {
-        viewModal.hide();
-        openModal(task.id);
-    };
+        document.getElementById('viewTaskTitle').textContent = task.title;
+        document.getElementById('viewTaskDescription').textContent = task.description ?? '—';
+        document.getElementById('viewTaskDueAt').textContent = task.due_at ? formatDateTimeWithTZ(task.due_at, timeZone, task.profile_timezone) : '—';
+        document.getElementById('viewTaskStatus').textContent = task.status === 'done' ? 'Done' : 'Pending';
+        document.getElementById('viewTaskUrgent').checked = task.urgent;
+        document.getElementById('viewTaskImportant').checked = task.important;
 
-    viewModal.show();
+        // Set up Edit button to close view modal and open edit modal
+        const editBtn = document.getElementById('viewTaskEditBtn');
+        editBtn.onclick = () => {
+            viewModal.hide();
+            openModal(task.id);
+        };
+
+        viewModal.show();
+    } catch (err) {
+        showToast('Failed to fetch task information: ' + err.message);
+    }
 }
 
 async function handleSubmit(e) {

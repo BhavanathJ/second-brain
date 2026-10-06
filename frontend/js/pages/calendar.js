@@ -41,7 +41,7 @@ function bucketData(data) {
     data.calendarEvents.forEach(e => {
         const startStr = getLocalDateString(timeZone, new Date(e.starts_at));
         const endStr = e.ends_at ? getLocalDateString(timeZone, new Date(e.ends_at)) : startStr;
-        
+
         let currentStr = startStr;
         while (currentStr <= endStr) {
             addItem(currentStr, 'events', e);
@@ -452,7 +452,7 @@ function openEventModal(eventId) {
         container.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
         bindProfileTargetSelect(container);
     }
-    
+
     modal.show();
 }
 
@@ -468,7 +468,7 @@ async function openViewEventModal(eventId) {
 
         document.getElementById('viewEventTitle').textContent = event.title;
         document.getElementById('viewEventStartsAt').textContent = formatDateTimeWithTZ(event.starts_at, timeZone, event.profile_timezone);
-        
+
         const endsAtContainer = document.getElementById('viewEventEndsAtContainer');
         if (event.ends_at) {
             document.getElementById('viewEventEndsAt').textContent = formatDateTimeWithTZ(event.ends_at, timeZone, event.profile_timezone);

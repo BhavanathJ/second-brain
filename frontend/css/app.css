@@ -1122,6 +1122,12 @@ a:hover {
     border-bottom: 2px solid var(--sb-border-light);
 }
 
+.quadrant-content {
+    height: 190px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
 .task-item {
     display: flex;
     align-items: flex-start;
@@ -1846,11 +1852,10 @@ a:hover {
 }
 
 /* Hide scrollbars for specific containers to avoid breaking JS calculations */
-html, body, .quadrant > div, .matrix-grid, .dash-section {
+html, body, .matrix-grid, .dash-section {
     scrollbar-width: none;
 }
 html::-webkit-scrollbar, body::-webkit-scrollbar,
-.quadrant > div::-webkit-scrollbar, 
 .matrix-grid::-webkit-scrollbar, 
 .dash-section::-webkit-scrollbar {
     display: none;

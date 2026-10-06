@@ -59,9 +59,9 @@ function getLocalDayBounds(timeZone, daysOffset = 0, now = new Date()) {
     return { start: start.toISOString(), end: end.toISOString() };
 }
 
-function getLocalRangeBounds(timeZone, days, now = new Date()) {
-    const start = getLocalDayBounds(timeZone, 0, now).start;
-    const end = getLocalDayBounds(timeZone, days - 1, now).end;
+function getLocalRangeBounds(timeZone, days, daysOffset = 0, now = new Date()) {
+    const start = getLocalDayBounds(timeZone, daysOffset, now).start;
+    const end = getLocalDayBounds(timeZone, daysOffset + days - 1, now).end;
     return { start, end };
 }
 

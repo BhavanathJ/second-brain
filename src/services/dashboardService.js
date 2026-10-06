@@ -117,7 +117,7 @@ async function getCalendarEventsForRange(profileId, start, end) {
 async function getDashboardData(profileId, timeZone) {
     const today = getLocalDayBounds(timeZone, 0);
     const tomorrow = getLocalDayBounds(timeZone, 1);
-    const next7 = getLocalRangeBounds(timeZone, 7);
+    const next7 = getLocalRangeBounds(timeZone, 7, 2);
 
     const [
         todayTasks,

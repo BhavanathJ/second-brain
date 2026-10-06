@@ -1122,8 +1122,8 @@ a:hover {
     border-bottom: 2px solid var(--sb-border-light);
 }
 
-.quadrant-content {
-    height: 190px;
+.fixed-list-content {
+    max-height: 190px;
     overflow-y: auto;
     padding-right: 0.25rem;
 }

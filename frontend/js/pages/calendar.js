@@ -205,6 +205,7 @@ function renderDayPanel() {
 
     panel.innerHTML = `
     <div class="dash-section-title">${label}</div>
+    <div class="fixed-list-content">
     ${sortedRows.length === 0 ? '<div class="dash-empty">Nothing on this day.</div>' : sortedRows.map(r => {
         const isDone = !!r.is_done;
         let checkbox = '';
@@ -241,6 +242,7 @@ function renderDayPanel() {
         </div>
         `;
     }).join('')}
+    </div>
   `;
 
     wireDayPanelEvents();

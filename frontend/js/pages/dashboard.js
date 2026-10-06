@@ -85,6 +85,7 @@ function renderOverdue(tasks, timeZone) {
     section.innerHTML = `
     <div class="dash-card dash-overdue">
       <div class="dash-section-title">Overdue</div>
+      <div class="fixed-list-content">
       ${sorted.map(t => {
         const isDone = t.status === 'done';
         return `
@@ -96,6 +97,7 @@ function renderOverdue(tasks, timeZone) {
           </div>
         `;
     }).join('')}
+      </div>
     </div>
   `;
 }

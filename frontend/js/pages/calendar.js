@@ -6,7 +6,7 @@ import { initProfileFilter } from '../profileFilter.js';
 import {
     getLocalDateString, addDays, addMonths,
     getLocalMonthBounds, getLocalWeekBounds, getLocalDayBounds,
-    formatTimeWithTZ,
+    formatTimeWithTZ, formatDateTimeWithTZ,
 } from '../timeUtils.js';
 import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
 import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
@@ -23,6 +23,7 @@ let itemsByDate = new Map();
 let selectedDateStr = null;
 const modalEl = document.getElementById('eventModal');
 const modal = new bootstrap.Modal(modalEl);
+let viewEventModal = null;
 let currentProfileFilter = null;
 let profilesCache = [];
 
@@ -38,7 +39,15 @@ function bucketData(data) {
         addItem(getLocalDateString(timeZone, new Date(t.due_at)), 'tasks', t);
     });
     data.calendarEvents.forEach(e => {
-        addItem(getLocalDateString(timeZone, new Date(e.starts_at)), 'events', e);
+        const startStr = getLocalDateString(timeZone, new Date(e.starts_at));
+        const endStr = e.ends_at ? getLocalDateString(timeZone, new Date(e.ends_at)) : startStr;
+        
+        let currentStr = startStr;
+        while (currentStr <= endStr) {
+            addItem(currentStr, 'events', e);
+            if (currentStr === endStr) break;
+            currentStr = addDays(currentStr, 1);
+        }
     });
     data.reminders.forEach(r => {
         addItem(getLocalDateString(timeZone, new Date(r.remind_at)), 'reminders', r);
@@ -158,14 +167,23 @@ function renderDayPanel() {
             is_done: t.status === 'done',
             profile_id: t.profile_id
         })),
-        ...items.events.map(e => ({
-            badge: 'event',
-            title: e.title,
-            time: formatTimeWithTZ(e.starts_at, timeZone, e.profile_timezone),
-            id: e.id,
-            is_done: false,
-            profile_id: e.profile_id
-        })),
+        ...items.events.map(e => {
+            let timeStr = formatTimeWithTZ(e.starts_at, timeZone, e.profile_timezone);
+            if (e.ends_at) {
+                timeStr += ' - ' + formatTimeWithTZ(e.ends_at, timeZone, e.profile_timezone);
+            }
+            if (e.location) {
+                timeStr += ` | ${e.location}`;
+            }
+            return {
+                badge: 'event',
+                title: e.title,
+                time: timeStr,
+                id: e.id,
+                is_done: false,
+                profile_id: e.profile_id
+            };
+        }),
         ...items.reminders.map(r => ({
             badge: 'reminder',
             title: r.title,
@@ -197,9 +215,13 @@ function renderDayPanel() {
         }
 
         let deleteBtn = '';
+        let viewBtn = '';
+        let editBtn = '';
         if (r.badge === 'task') {
             deleteBtn = `<button class="btn btn-outline-danger btn-sm task-delete-btn" data-id="${r.id}">Delete</button>`;
         } else if (r.badge === 'event') {
+            viewBtn = `<button class="btn btn-outline-secondary btn-sm event-view-btn" data-id="${r.id}">View</button>`;
+            editBtn = `<button class="btn btn-outline-secondary btn-sm event-edit-btn" data-id="${r.id}">Edit</button>`;
             deleteBtn = `<button class="btn btn-outline-danger btn-sm event-delete-btn" data-id="${r.id}">Delete</button>`;
         } else if (r.badge === 'reminder') {
             deleteBtn = `<button class="btn btn-outline-danger btn-sm reminder-delete-btn" data-id="${r.id}">Delete</button>`;
@@ -212,7 +234,9 @@ function renderDayPanel() {
           <span class="flex-grow-1 cal-item-title${isDone ? ' dash-habit-done' : ''}">
             ${escapeHtml(r.title)}${renderProfileBadge(r)}
           </span>
-          <span class="dash-item-time">${r.time}</span>
+          <span class="dash-item-time" style="margin-right: 10px;">${r.time}</span>
+          ${viewBtn}
+          ${editBtn}
           ${deleteBtn}
         </div>
         `;
@@ -290,6 +314,22 @@ function wireDayPanelEvents() {
                 showToast('Failed to delete event: ' + err.message);
                 btn.disabled = false;
             }
+        });
+    });
+
+    // Event view
+    document.querySelectorAll('.event-view-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openViewEventModal(btn.dataset.id);
+        });
+    });
+
+    // Event edit
+    document.querySelectorAll('.event-edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEventModal(btn.dataset.id);
         });
     });
 
@@ -374,29 +414,116 @@ function switchView(mode) {
     loadView();
 }
 
+function localInputToISO(value) {
+    if (!value) return null;
+    return new Date(value).toISOString();
+}
+
+function isoToLocalInput(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function openEventModal(eventId) {
+    const form = document.getElementById('eventForm');
+    form.reset();
+    document.getElementById('eventId').value = '';
+
+    if (eventId) {
+        let event = null;
+        for (const items of itemsByDate.values()) {
+            event = items.events.find(e => e.id === eventId);
+            if (event) break;
+        }
+        if (!event) return;
+
+        document.getElementById('eventModalTitle').textContent = 'Edit Calendar Event';
+        document.getElementById('eventId').value = event.id;
+        document.getElementById('eventTitle').value = event.title;
+        document.getElementById('eventStartsAt').value = isoToLocalInput(event.starts_at);
+        document.getElementById('eventEndsAt').value = isoToLocalInput(event.ends_at);
+        document.getElementById('eventLocation').value = event.location || '';
+        document.getElementById('profileTargetContainer').innerHTML = '';
+    } else {
+        document.getElementById('eventModalTitle').textContent = 'Add Calendar Event';
+        const container = document.getElementById('profileTargetContainer');
+        container.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
+        bindProfileTargetSelect(container);
+    }
+    
+    modal.show();
+}
+
+async function openViewEventModal(eventId) {
+    if (!viewEventModal) {
+        const viewModalEl = document.getElementById('viewEventModal');
+        viewEventModal = new bootstrap.Modal(viewModalEl);
+    }
+
+    try {
+        const { event } = await apiFetch(`/calendar-events/${eventId}`);
+        if (!event) return;
+
+        document.getElementById('viewEventTitle').textContent = event.title;
+        document.getElementById('viewEventStartsAt').textContent = formatDateTimeWithTZ(event.starts_at, timeZone, event.profile_timezone);
+        
+        const endsAtContainer = document.getElementById('viewEventEndsAtContainer');
+        if (event.ends_at) {
+            document.getElementById('viewEventEndsAt').textContent = formatDateTimeWithTZ(event.ends_at, timeZone, event.profile_timezone);
+            endsAtContainer.style.display = 'block';
+        } else {
+            endsAtContainer.style.display = 'none';
+        }
+
+        const locationContainer = document.getElementById('viewEventLocationContainer');
+        if (event.location) {
+            document.getElementById('viewEventLocation').textContent = event.location;
+            locationContainer.style.display = 'block';
+        } else {
+            locationContainer.style.display = 'none';
+        }
+
+        const editBtn = document.getElementById('viewEventEditBtn');
+        editBtn.onclick = () => {
+            viewEventModal.hide();
+            openEventModal(event.id);
+        };
+
+        viewEventModal.show();
+    } catch (err) {
+        showToast('Failed to fetch event information: ' + err.message);
+    }
+}
+
 async function handleEventSubmit(e) {
     e.preventDefault();
+    const eventId = document.getElementById('eventId').value;
     const { payload: targetPayload, targetName, isDifferent } = getProfileTargetPayload(document.getElementById('eventForm'), profilesCache, getActiveProfileId());
 
     const payload = {
         title: document.getElementById('eventTitle').value.trim(),
-        starts_at: new Date(document.getElementById('eventStartsAt').value).toISOString(),
-        ends_at: document.getElementById('eventEndsAt').value
-            ? new Date(document.getElementById('eventEndsAt').value).toISOString()
-            : null,
+        starts_at: localInputToISO(document.getElementById('eventStartsAt').value),
+        ends_at: localInputToISO(document.getElementById('eventEndsAt').value),
         location: document.getElementById('eventLocation').value.trim() || null,
         ...targetPayload
     };
 
     try {
-        await apiFetch('/calendar-events', { method: 'POST', body: JSON.stringify(payload) });
+        if (eventId) {
+            await apiFetch(`/calendar-events/${eventId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+            showToast('Event saved', 'success');
+        } else {
+            await apiFetch('/calendar-events', { method: 'POST', body: JSON.stringify(payload) });
+            if (isDifferent) {
+                showToast(`Event created in ${targetName}`, 'success');
+            } else {
+                showToast('Event saved', 'success');
+            }
+        }
         modal.hide();
         document.getElementById('eventForm').reset();
-        if (isDifferent) {
-            showToast(`Event created in ${targetName}`, 'success');
-        } else {
-            showToast('Event saved', 'success');
-        }
         await loadView();
     } catch (err) {
         showToast('Failed to save event: ' + err.message);
@@ -429,12 +556,7 @@ async function main() {
     document.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', () => switchView(btn.dataset.view));
     });
-    document.getElementById('addEventBtn').addEventListener('click', () => {
-        const container = document.getElementById('profileTargetContainer');
-        container.innerHTML = renderProfileTargetSelect(profilesCache, getActiveProfileId());
-        bindProfileTargetSelect(container);
-        modal.show();
-    });
+    document.getElementById('addEventBtn').addEventListener('click', () => openEventModal(null));
     document.getElementById('eventForm').addEventListener('submit', handleEventSubmit);
 
     try {

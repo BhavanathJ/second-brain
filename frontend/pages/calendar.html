@@ -65,8 +65,9 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form id="eventForm">
+                    <input type="hidden" id="eventId" />
                     <div class="modal-header">
-                        <h5 class="modal-title">Add Calendar Event</h5>
+                        <h5 class="modal-title" id="eventModalTitle">Add Calendar Event</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -94,6 +95,32 @@
                         <button type="submit" class="btn btn-primary btn-sm">Save</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="viewEventModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewEventTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <strong>Starts at:</strong> <span id="viewEventStartsAt"></span>
+                    </div>
+                    <div class="mb-3" id="viewEventEndsAtContainer" style="display: none;">
+                        <strong>Ends at:</strong> <span id="viewEventEndsAt"></span>
+                    </div>
+                    <div class="mb-3" id="viewEventLocationContainer" style="display: none;">
+                        <strong>Location:</strong> <span id="viewEventLocation"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="viewEventEditBtn">Edit</button>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>

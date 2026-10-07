@@ -70,7 +70,7 @@ async function listProfiles(req, res) {
 }
 
 async function createProfile(req, res) {
-    const { name, timezone } = req.body;
+    const { name, timezone, color } = req.body;
 
     if (!name || !name.trim()) {
         return res.status(400).json({ error: 'Profile name is required.' });
@@ -93,8 +93,22 @@ async function createProfile(req, res) {
             return res.status(400).json({ error: 'A profile with this name already exists.' });
         }
 
-        // Auto-assign a color not already used by this user's profiles
-        const assignedColor = await autoAssignColor(req.userId);
+        let assignedColor;
+        if (color !== undefined) {
+            const validation = validateColor(color, req.userId);
+            if (!validation.valid) {
+                return res.status(400).json({ error: validation.error });
+            }
+
+            const duplicateColor = profiles.find(p => (p.color || '#6B7280').toUpperCase() === color.toUpperCase());
+            if (duplicateColor) {
+                return res.status(400).json({ error: 'Another profile already uses this color.' });
+            }
+            assignedColor = color;
+        } else {
+            // Auto-assign a color not already used by this user's profiles
+            assignedColor = await autoAssignColor(req.userId);
+        }
 
         const profile = await profileService.createProfile(req.userId, trimmedName, assignedColor);
         await settingsService.createDefaultSettings(profile.id, validatedTimezone);

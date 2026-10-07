@@ -12,6 +12,9 @@ router.get('/', binController.listBin);
 // something back to life, which is semantically a POST not a PATCH.
 router.post('/:id/restore', binController.restoreEntry);
 
+// DELETE to empty entire bin
+router.delete('/', binController.emptyBin);
+
 // DELETE to permanently delete — matches HTTP semantics exactly.
 router.delete('/:id', binController.permanentDelete);
 

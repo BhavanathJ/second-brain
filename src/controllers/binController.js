@@ -88,6 +88,45 @@ async function restoreEntry(req, res) {
     }
 }
 
+async function emptyBin(req, res) {
+    try {
+        let profileIds;
+        try {
+            profileIds = await resolveProfileIds(req.userId, req.profileId, req.query.profile_ids);
+        } catch (err) {
+            return res.status(err.statusCode || 500).json({ error: err.message });
+        }
+
+        const entries = profileIds.length === 1 && profileIds[0] === req.profileId
+            ? await binService.listBinEntries(req.profileId)
+            : await binService.listBinEntriesForProfiles(profileIds);
+
+        for (const entry of entries) {
+            const owns = await verifyProfileOwnership(req.userId, entry.profile_id);
+            if (!owns) continue;
+
+            const handler = entityHandlers[entry.entity_type];
+            if (!handler) continue;
+
+            try {
+                await handler.hardDelete(entry.profile_id, entry.entity_id);
+                await binService.removeBinEntry(entry.profile_id, entry.id);
+
+                if (entry.entity_type === 'task') {
+                    await noteService.clearConvertedTaskId(entry.profile_id, entry.entity_id);
+                }
+            } catch (err) {
+                console.error(`Failed to delete ${entry.entity_type} ${entry.entity_id} during emptyBin:`, err);
+            }
+        }
+
+        return res.status(204).send();
+    } catch (err) {
+        console.error('Empty bin error:', err);
+        return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
+}
+
 async function permanentDelete(req, res) {
     try {
         const entry = await binService.getBinEntryByIdOnly(req.params.id);
@@ -146,4 +185,4 @@ async function purgeExpiredEntries() {
     }
 }
 
-module.exports = { listBin, restoreEntry, permanentDelete, purgeExpiredEntries };
+module.exports = { listBin, restoreEntry, permanentDelete, emptyBin, purgeExpiredEntries };

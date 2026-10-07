@@ -6,11 +6,21 @@ import { getOffsetMinutes } from '../timeUtils.js';
 import { getTimezoneDisplayLabel, getFriendlyTimezoneName, normalizeTimezone } from '../timezoneNames.js';
 import { escapeHtml } from '../utils.js';
 
+let addProfileModal = null;
 let renameProfileModal = null;
 let deleteProfileModal = null;
 let profileToRenameId = null;
 let profileToDeleteId = null;
 let profileToDeleteName = null;
+
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
 
 function getOffsetMinutesValue(timezone) {
     return getOffsetMinutes(new Date(), timezone);
@@ -209,15 +219,21 @@ async function handleSubmit(e) {
 async function handleAddProfile(e) {
     e.preventDefault();
     const nameInput = document.getElementById('newProfileName');
+    const colorInput = document.getElementById('newProfileColor');
     const name = nameInput.value.trim();
     if (!name) return;
 
     // Auto-detect browser timezone for new profile
     const timezone = getBrowserTimezone();
+    const color = colorInput ? colorInput.value : undefined;
 
     try {
-        await apiFetch('/profiles', { method: 'POST', body: JSON.stringify({ name, timezone }) });
+        const bodyData = { name, timezone };
+        if (color) bodyData.color = color;
+        
+        await apiFetch('/profiles', { method: 'POST', body: JSON.stringify(bodyData) });
         nameInput.value = '';
+        if (addProfileModal) addProfileModal.hide();
         window.location.reload();
     } catch (err) {
         showToast('Failed to create profile: ' + err.message);
@@ -407,6 +423,30 @@ async function main() {
     document.getElementById('addProfileForm').addEventListener('submit', handleAddProfile);
     document.getElementById('confirmRenameBtn').addEventListener('click', handleRenameConfirm);
     document.getElementById('confirmDeleteBtn').addEventListener('click', handleDeleteConfirm);
+
+    const showAddBtn = document.getElementById('showAddProfileBtn');
+    if (showAddBtn) {
+        showAddBtn.addEventListener('click', () => {
+            if (!addProfileModal) {
+                addProfileModal = new bootstrap.Modal(document.getElementById('addProfileModal'));
+            }
+            document.getElementById('addProfileForm').reset();
+            const randomColor = getRandomColor();
+            const colorInput = document.getElementById('newProfileColor');
+            if (colorInput) {
+                colorInput.value = randomColor;
+                document.getElementById('newProfileColorHex').textContent = randomColor;
+            }
+            addProfileModal.show();
+        });
+    }
+
+    const newColorInput = document.getElementById('newProfileColor');
+    if (newColorInput) {
+        newColorInput.addEventListener('input', (e) => {
+            document.getElementById('newProfileColorHex').textContent = e.target.value.toUpperCase();
+        });
+    }
 
     try {
         await loadSettings();

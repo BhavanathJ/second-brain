@@ -72,6 +72,37 @@ async function loadBin() {
 }
 
 function wireEvents() {
+    const emptyBtn = document.getElementById('emptyBinBtn');
+    if (emptyBtn) {
+        emptyBtn.onclick = async () => {
+            const ok = await confirmAction('Permanently delete ALL items in the bin? This cannot be undone.');
+            if (!ok) return;
+            
+            try {
+                // Respect the current profile filter when emptying
+                let url = '/bin';
+                if (currentProfileFilter === 'all') {
+                    url += '?profile_ids=all';
+                } else if (Array.isArray(currentProfileFilter) && currentProfileFilter.length > 0) {
+                    url += `?profile_ids=${currentProfileFilter.join(',')}`;
+                }
+                
+                // Disable button during operation
+                emptyBtn.disabled = true;
+                emptyBtn.textContent = 'Emptying...';
+                
+                await apiFetch(url, { method: 'DELETE' });
+                showToast('Bin emptied permanently', 'success');
+                await loadBin();
+            } catch (err) {
+                showToast('Failed to empty bin: ' + err.message);
+            } finally {
+                emptyBtn.disabled = false;
+                emptyBtn.textContent = 'Empty Bin';
+            }
+        };
+    }
+
     document.querySelectorAll('.bin-restore-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             btn.disabled = true;

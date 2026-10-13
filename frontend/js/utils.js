@@ -21,3 +21,31 @@ export function renderProfileBadge(profile) {
         </span>
     `;
 }
+
+/**
+ * Determines whether profile badges should be displayed for records.
+ * Badges are displayed when:
+ * 1. The active filter includes multiple profiles (e.g. 'all' when user has >1 profile, or an array with >1 profile IDs).
+ * 2. OR the items currently displayed span >1 profile.
+ *
+ * @param {string|Array|null} profileFilter - Current profile filter ('all', array of IDs, comma-separated string, or null).
+ * @param {Array} profiles - List of available profiles for the user.
+ * @param {Array} itemProfileIds - Array of profile IDs from displayed items.
+ * @returns {boolean} Whether profile badges should be shown.
+ */
+export function shouldShowProfileBadge(profileFilter, profiles = [], itemProfileIds = []) {
+    // If the filter includes multiple profiles
+    if (profileFilter === 'all' && (profiles?.length ?? 0) > 1) {
+        return true;
+    }
+    if (Array.isArray(profileFilter) && profileFilter.length > 1) {
+        return true;
+    }
+    if (typeof profileFilter === 'string' && profileFilter !== 'all' && profileFilter.split(',').filter(Boolean).length > 1) {
+        return true;
+    }
+    // If the displayed items themselves span multiple profiles
+    const distinctItemProfiles = new Set(itemProfileIds.filter(Boolean));
+    return distinctItemProfiles.size > 1;
+}
+

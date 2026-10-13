@@ -3,7 +3,7 @@ import { apiFetch } from '../api.js';
 import { initProfileFilter } from '../profileFilter.js';
 import { confirmAction } from '../confirmDialog.js';
 import { showToast } from '../toast.js';
-import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup, shouldShowProfileBadge } from '../utils.js';
 import { formatTimeWithTZ, formatDateWithTZ } from '../timeUtils.js';
 
 function renderEmpty(label) {
@@ -167,8 +167,11 @@ function renderMixedList(mountId, { tasks = [], reminders = [], calendar_events 
 }
 
 function renderProfileBadge(item) {
-    const profileIds = [...new Set(allItemsWithProfileId())];
-    const showBadge = profileIds.length > 1 && item.profile_id;
+    const showBadge = shouldShowProfileBadge(
+        currentProfileFilter,
+        profilesCache,
+        allItemsWithProfileId()
+    ) && item.profile_id;
     if (!showBadge) return '';
     return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
@@ -218,15 +221,12 @@ async function loadDashboard(timeZone) {
     ];
 
     // Cache profiles for badge rendering
-    const profileIds = [...new Set(allItemsCache.map(i => i.profile_id).filter(Boolean))];
-    if (profileIds.length > 0) {
-        try {
-            const { profiles } = await apiFetch('/profiles');
-            profilesCache = profiles;
-        } catch (err) {
-            console.error('Failed to load profiles for badges:', err);
-            profilesCache = [];
-        }
+    try {
+        const { profiles } = await apiFetch('/profiles');
+        profilesCache = profiles;
+    } catch (err) {
+        console.error('Failed to load profiles for badges:', err);
+        profilesCache = [];
     }
 
     renderOverdue(data.overdue.tasks, timeZone);

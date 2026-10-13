@@ -8,7 +8,7 @@ import {
     getLocalMonthBounds, getLocalWeekBounds, getLocalDayBounds,
     formatTimeWithTZ, formatDateTimeWithTZ,
 } from '../timeUtils.js';
-import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup, shouldShowProfileBadge } from '../utils.js';
 import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 function labelForDate(dateStr, opts) {
@@ -70,11 +70,15 @@ function renderProfileBadge(item) {
     const allItems = Array.from(itemsByDate.values()).flatMap(d =>
         [...d.tasks, ...d.events, ...d.reminders, ...d.habits]
     );
-    const profileIds = [...new Set(allItems.map(i => i.profile_id).filter(Boolean))];
-    const showBadge = profileIds.length > 1 && item.profile_id;
+    const showBadge = shouldShowProfileBadge(
+        currentProfileFilter,
+        profilesCache,
+        allItems.map(i => i.profile_id)
+    ) && item.profile_id;
     if (!showBadge) return '';
     return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
+
 
 function renderMonthGrid() {
     const grid = document.getElementById('calGrid');

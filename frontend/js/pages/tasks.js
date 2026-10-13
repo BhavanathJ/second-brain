@@ -4,7 +4,7 @@ import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
 import { formatDateTimeWithTZ } from '../timeUtils.js';
-import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup, shouldShowProfileBadge } from '../utils.js';
 import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 let timeZone = 'UTC';
@@ -23,12 +23,19 @@ function bucketTasks(tasks) {
     };
 }
 
-function renderTaskItem(task) {
-    const profileIds = [...new Set(allTasks.map(t => t.profile_id))];
-    const showProfileBadge = profileIds.length > 1 && task.profile_id;
-    const profileBadge = showProfileBadge
+function renderProfileBadge(task) {
+    const showProfileBadge = shouldShowProfileBadge(
+        currentProfileFilter,
+        profilesCache,
+        allTasks.map(t => t.profile_id)
+    ) && task.profile_id;
+    return showProfileBadge
         ? renderBadgeMarkup(profilesCache.find(p => p.id === task.profile_id))
         : '';
+}
+
+function renderTaskItem(task) {
+    const profileBadge = renderProfileBadge(task);
 
     return `
     <div class="task-item${task.status === 'done' ? ' task-done' : ''}">

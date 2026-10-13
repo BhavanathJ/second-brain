@@ -3,7 +3,7 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
-import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup, shouldShowProfileBadge } from '../utils.js';
 
 // NOTE: bin's formatDate includes a year (bin entries can be old) —
 // deliberately NOT the same as timeUtils.js's formatDate, so it's kept
@@ -26,14 +26,14 @@ let timeZone = 'UTC';
 let currentProfileFilter = null;
 let profilesCache = [];
 
-// NOTE: unlike every other page's showBadge check (which looks at
-// whether the ITEMS currently being displayed span >1 profile), this
-// looks at whether the user owns >1 profile at all. That's a real
-// behavioral difference worth a deliberate call, not something this
-// refactor should silently change — flagged separately, left as-is.
+let allEntries = [];
+
 function renderProfileBadge(item) {
-    const profileIds = [...new Set(profilesCache.map(p => p.id).filter(Boolean))];
-    const showBadge = profileIds.length > 1 && item.profile_id;
+    const showBadge = shouldShowProfileBadge(
+        currentProfileFilter,
+        profilesCache,
+        allEntries.map(e => e.profile_id)
+    ) && item.profile_id;
     if (!showBadge) return '';
     return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
@@ -64,6 +64,18 @@ async function loadBin() {
         url += `?profile_ids=${currentProfileFilter.join(',')}`;
     }
     const { entries } = await apiFetch(url);
+    allEntries = entries;
+
+    if (!profilesCache.length) {
+        try {
+            const { profiles } = await apiFetch('/profiles');
+            profilesCache = profiles;
+        } catch (err) {
+            console.error('Failed to load profiles for badges:', err);
+            profilesCache = [];
+        }
+    }
+
     const mount = document.getElementById('binList');
     mount.innerHTML = entries.length === 0
         ? '<div class="dash-empty">Bin is empty.</div>'

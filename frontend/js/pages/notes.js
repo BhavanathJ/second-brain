@@ -3,7 +3,7 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
-import { escapeHtml, renderProfileBadge as renderBadgeMarkup } from '../utils.js';
+import { escapeHtml, renderProfileBadge as renderBadgeMarkup, shouldShowProfileBadge } from '../utils.js';
 import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
 function parseTags(input) {
@@ -22,11 +22,15 @@ let currentProfileFilter = null;
 let profilesCache = [];
 
 function renderProfileBadge(item) {
-    const profileIds = [...new Set(allNotes.map(n => n.profile_id).filter(Boolean))];
-    const showBadge = profileIds.length > 1 && item.profile_id;
+    const showBadge = shouldShowProfileBadge(
+        currentProfileFilter,
+        profilesCache,
+        allNotes.map(n => n.profile_id)
+    ) && item.profile_id;
     if (!showBadge) return '';
     return renderBadgeMarkup(profilesCache.find(p => p.id === item.profile_id));
 }
+
 
 function renderNote(note) {
     const tagsHTML = note.tags.length

@@ -3,6 +3,7 @@ import { apiFetch } from '../api.js';
 import { showToast } from '../toast.js';
 import { confirmAction } from '../confirmDialog.js';
 import { initProfileFilter } from '../profileFilter.js';
+import { formatDateTimeWithTZ } from '../timeUtils.js';
 import { escapeHtml, renderProfileBadge as renderBadgeMarkup, shouldShowProfileBadge } from '../utils.js';
 import { renderProfileTargetSelect, bindProfileTargetSelect, getProfileTargetPayload, getActiveProfileId } from '../profileTargetSelect.js?v=2';
 
@@ -15,6 +16,8 @@ function localInputToISO(value) {
     return new Date(value).toISOString();
 }
 
+let timeZone = 'UTC';
+let viewModal = null;
 let editModal = null;
 let convertModal = null;
 let allNotes = [];
@@ -44,12 +47,11 @@ function renderNote(note) {
     return `
     <div class="note-card" data-note-id="${note.id}">
       <div class="note-content" id="content-${note.id}">${escapeHtml(note.content)}</div>
-      <button type="button" class="btn btn-link btn-sm p-0 note-toggle-btn d-none"
-              data-target="content-${note.id}" aria-expanded="false">Show more</button>
       ${tagsHTML}
       <div class="note-footer">
         ${convertedHTML}${renderProfileBadge(note)}
         <div class="note-actions">
+          <button class="btn btn-outline-secondary note-view-btn" data-id="${note.id}">View</button>
           <button class="btn btn-outline-secondary note-edit-btn" data-id="${note.id}">Edit</button>
           <button class="btn btn-outline-danger note-delete-btn" data-id="${note.id}">Delete</button>
         </div>
@@ -103,6 +105,10 @@ async function loadNotes(tags = []) {
 }
 
 function wireItemEvents() {
+    document.querySelectorAll('.note-view-btn').forEach(btn => {
+        btn.addEventListener('click', () => openViewModal(btn.dataset.id));
+    });
+
     document.querySelectorAll('.note-edit-btn').forEach(btn => {
         btn.addEventListener('click', () => openEditModal(btn.dataset.id));
     });
@@ -124,36 +130,69 @@ function wireItemEvents() {
     document.querySelectorAll('.note-convert-btn').forEach(btn => {
         btn.addEventListener('click', () => openConvertModal(btn.dataset.id, btn.dataset.content));
     });
-
-    // Keyboard-accessible expand/collapse — a real <button>, not a click
-    // handler on the text itself, so Tab/Enter/Space work and screen
-    // readers get a proper aria-expanded announcement.
-    document.querySelectorAll('.note-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const contentEl = document.getElementById(btn.dataset.target);
-            const isExpanded = contentEl.classList.toggle('expanded');
-            btn.setAttribute('aria-expanded', String(isExpanded));
-            btn.textContent = isExpanded ? 'Show less' : 'Show more';
-        });
-    });
-
-    updateNoteToggleVisibility();
 }
 
-// Only show "Show more" on notes that are ACTUALLY clamped — a short
-// note doesn't need a toggle button that does nothing. Must run after
-// the DOM has actually laid out the clamped text (requestAnimationFrame
-// waits for the next paint), or scrollHeight/clientHeight would still
-// reflect the pre-render state.
-function updateNoteToggleVisibility() {
-    requestAnimationFrame(() => {
-        document.querySelectorAll('.note-content').forEach(contentEl => {
-            const toggleBtn = document.querySelector(`.note-toggle-btn[data-target="${contentEl.id}"]`);
-            if (!toggleBtn) return;
-            const isTruncated = contentEl.scrollHeight > contentEl.clientHeight + 1; // +1 guards against sub-pixel rounding
-            toggleBtn.classList.toggle('d-none', !isTruncated);
-        });
-    });
+async function openViewModal(noteId) {
+    if (!viewModal) {
+        const viewModalEl = document.getElementById('viewNoteModal');
+        viewModal = new bootstrap.Modal(viewModalEl);
+    }
+
+    const note = allNotes.find(n => n.id === noteId);
+    if (!note) return;
+
+    // Content
+    const contentEl = document.getElementById('viewNoteContent');
+    contentEl.textContent = note.content;
+
+    // Profile badge
+    const badgeEl = document.getElementById('viewNoteProfileBadge');
+    badgeEl.innerHTML = renderProfileBadge(note);
+
+    // Creation date with timezone
+    const dateEl = document.getElementById('viewNoteDate');
+    const profile = profilesCache.find(p => p.id === note.profile_id);
+    const itemTz = profile?.timezone || note.profile_timezone;
+    if (note.created_at) {
+        dateEl.textContent = 'Created ' + formatDateTimeWithTZ(note.created_at, timeZone, itemTz);
+    } else {
+        dateEl.textContent = '';
+    }
+
+    // Tags
+    const tagsGroupEl = document.getElementById('viewNoteTagsGroup');
+    const tagsEl = document.getElementById('viewNoteTags');
+    if (note.tags && note.tags.length > 0) {
+        tagsGroupEl.classList.remove('d-none');
+        tagsEl.innerHTML = `<div class="note-tags">${note.tags.map(t => `<span class="note-tag">${escapeHtml(t)}</span>`).join('')}</div>`;
+    } else {
+        tagsGroupEl.classList.add('d-none');
+        tagsEl.innerHTML = '';
+    }
+
+    // Status & convert button
+    const statusContainer = document.getElementById('viewNoteStatusContainer');
+    const convertBtn = document.getElementById('viewNoteConvertBtn');
+    if (note.converted_task_id) {
+        statusContainer.innerHTML = `<span class="note-converted-badge">✓ Converted to task</span>`;
+        convertBtn.classList.add('d-none');
+    } else {
+        statusContainer.innerHTML = '';
+        convertBtn.classList.remove('d-none');
+        convertBtn.onclick = () => {
+            viewModal.hide();
+            openConvertModal(note.id, note.content);
+        };
+    }
+
+    // Edit button: closes view modal and opens edit modal
+    const editBtn = document.getElementById('viewNoteEditBtn');
+    editBtn.onclick = () => {
+        viewModal.hide();
+        openEditModal(note.id);
+    };
+
+    viewModal.show();
 }
 
 function openEditModal(noteId) {
@@ -277,6 +316,13 @@ function currentFilterTags() {
 async function main() {
     const layoutInfo = await initLayout('notes');
     if (!layoutInfo) return;
+
+    try {
+        const { settings } = await apiFetch('/settings');
+        timeZone = settings.timezone;
+    } catch (err) {
+        console.error('Failed to load settings, defaulting note times to UTC:', err);
+    }
 
     // Initialize profile filter
     await initProfileFilter((profileIds) => {

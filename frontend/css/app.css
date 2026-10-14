@@ -316,12 +316,6 @@ body,
 
 
 /* Page Layout Containers & Utilities */
-.note-content.expanded {
-    -webkit-line-clamp: unset;
-    line-clamp: unset;
-    overflow: visible;
-    max-height: none;
-}
 
 .task-item-actions button,
 .note-actions button,
@@ -1230,7 +1224,68 @@ a:hover {
     font-size: 0.94rem;
     line-height: 1.6;
     margin-bottom: 0.75rem;
-    cursor: pointer;
+    max-height: calc(1.6em * 5);
+    overflow-y: auto;
+    overflow-x: hidden;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    padding-right: 0.35rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-border-light) transparent;
+}
+
+.note-content:hover {
+    scrollbar-color: var(--sb-muted) transparent;
+}
+
+.note-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.note-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.note-content::-webkit-scrollbar-thumb {
+    background-color: var(--sb-border-light);
+    border-radius: 4px;
+}
+
+.note-content:hover::-webkit-scrollbar-thumb {
+    background-color: var(--sb-muted);
+}
+
+.note-view-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    padding: 0.85rem 1rem;
+    background: var(--sb-surface-alt);
+    border: var(--sb-border-width, 1.5px) solid var(--sb-border-light);
+    border-radius: var(--sb-radius-sm, 6px);
+    max-height: 55vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-border-light) transparent;
+}
+
+.note-view-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.note-view-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.note-view-content::-webkit-scrollbar-thumb {
+    background-color: var(--sb-border-light);
+    border-radius: 4px;
+}
+
+.note-view-content:hover::-webkit-scrollbar-thumb {
+    background-color: var(--sb-muted);
 }
 
 .note-tags {
